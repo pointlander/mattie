@@ -194,7 +194,84 @@ func GetTrainingData(sets []Set, s, t int) (opt []Opt) {
 	return opt
 }
 
+// Model model is the random matrix model
+type Model struct {
+	Query    matrix.RandomMatrix
+	Key      matrix.RandomMatrix
+	Value    matrix.RandomMatrix
+	Solution matrix.RandomMatrix
+}
+
+// Generator is a generator
+type Generator struct {
+	Query    matrix.Generator
+	Key      matrix.Generator
+	Value    matrix.Generator
+	Solution matrix.Generator
+}
+
+// Sample is a sample
+type Sample struct {
+	Query    matrix.Matrix
+	Key      matrix.Matrix
+	Value    matrix.Matrix
+	Solution matrix.Matrix
+}
+
 func main() {
+	rng := matrix.Rand(1)
 	sets := Load()
 	_ = sets
+	opts := GetTrainingData(sets, 0, 0)
+	model := Model{
+		Query:    matrix.NewRandomMatrix(Input, Input),
+		Key:      matrix.NewRandomMatrix(Input, Input),
+		Value:    matrix.NewRandomMatrix(Input, Input),
+		Solution: matrix.NewRandomMatrix(10, opts[0].TargetSize()),
+	}
+	generator := Generator{
+		Query:    model.Query.Sample(&rng),
+		Key:      model.Key.Sample(&rng),
+		Value:    model.Value.Sample(&rng),
+		Solution: model.Solution.Sample(&rng),
+	}
+	for i := 0; i < 33; i++ {
+		samples := make([]Sample, 33)
+		for i := range samples {
+			samples[i].Query = generator.Query.Sample()
+			samples[i].Key = generator.Key.Sample()
+			samples[i].Value = generator.Value.Sample()
+			samples[i].Solution = generator.Solution.Sample()
+		}
+		sum := 0.0
+		for i := range samples {
+			opts := GetTrainingData(sets, 0, 0)
+			for _, opt := range opts {
+				params := opt.Opt.Data[:Input*opt.TargetOffset()]
+				for j := 0; j < samples[i].Solution.Rows; j++ {
+					max, index := 0.0, 0
+					for k := 0; k < samples[i].Solution.Cols; k++ {
+						if value := float64(samples[i].Solution.Data[j*samples[i].Solution.Cols+k]); value > max {
+							max, index = value, k
+						}
+					}
+					params[j*Input+index] = 1
+					params[j*Input+10+j%opt.Output.Output.W] = 1
+					params[j*Input+10+30+j/opt.Output.Output.H] = 1
+					params[j*Input+10+30+30] = 1
+				}
+				out := matrix.SelfAttention(
+					samples[i].Query.MulT(opt.Opt),
+					samples[i].Key.MulT(opt.Opt),
+					samples[i].Value.MulT(opt.Opt))
+				for j := 0; j < out.Rows; j++ {
+					for k := 0; k < out.Cols; k++ {
+						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
+						sum += float64(diff * diff)
+					}
+				}
+			}
+		}
+		fmt.Println(sum)
+	}
 }
