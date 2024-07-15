@@ -247,7 +247,7 @@ func main() {
 		for i := range samples {
 			opts := GetTrainingData(sets, 0, 0)
 			for _, opt := range opts {
-				params := opt.Opt.Data[:Input*opt.TargetOffset()]
+				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < samples[i].Solution.Rows; j++ {
 					max, index := 0.0, 0
 					for k := 0; k < samples[i].Solution.Cols; k++ {
