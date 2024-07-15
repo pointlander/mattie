@@ -229,13 +229,13 @@ func main() {
 		Value:    matrix.NewRandomMatrix(Input, Input),
 		Solution: matrix.NewRandomMatrix(10, opts[0].TargetSize()),
 	}
-	generator := Generator{
-		Query:    model.Query.Sample(&rng),
-		Key:      model.Key.Sample(&rng),
-		Value:    model.Value.Sample(&rng),
-		Solution: model.Solution.Sample(&rng),
-	}
 	for i := 0; i < 33; i++ {
+		generator := Generator{
+			Query:    model.Query.Sample(&rng),
+			Key:      model.Key.Sample(&rng),
+			Value:    model.Value.Sample(&rng),
+			Solution: model.Solution.Sample(&rng),
+		}
 		samples := make([]Sample, 33)
 		for i := range samples {
 			samples[i].Query = generator.Query.Sample()
