@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/pointlander/matrix"
 )
@@ -216,6 +217,8 @@ type Sample struct {
 	Key      matrix.Matrix
 	Value    matrix.Matrix
 	Solution matrix.Matrix
+	Cost     float64
+	Grid     [][]int
 }
 
 func main() {
@@ -243,9 +246,10 @@ func main() {
 			samples[i].Value = generator.Value.Sample()
 			samples[i].Solution = generator.Solution.Sample()
 		}
-		sum := 0.0
+
 		for i := range samples {
 			opts := GetTrainingData(sets, 0, 0)
+			sum := 0.0
 			for _, opt := range opts {
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < samples[i].Solution.Rows; j++ {
@@ -271,7 +275,40 @@ func main() {
 					}
 				}
 			}
+			samples[i].Cost = sum
 		}
-		fmt.Println(sum)
+		sort.Slice(samples, func(i, j int) bool {
+			return samples[i].Cost < samples[j].Cost
+		})
+		fmt.Println(samples[0].Cost)
+		h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
+		grid := make([][]int, h)
+		for j := range grid {
+			grid[j] = make([]int, w)
+		}
+		for j := 0; j < samples[0].Solution.Rows; j++ {
+			max, index := 0.0, 0
+			for k := 0; k < samples[0].Solution.Cols; k++ {
+				if value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k]); value > max {
+					max, index = value, k
+				}
+			}
+			grid[j/h][j%w] = index
+		}
+		correct, count := 0.0, 0.0
+		for i := 0; i < h; i++ {
+			for j := 0; j < w; j++ {
+				count++
+				value := int(opts[0].Output.Output.I[i*w+j].C)
+				if value == grid[i][j] {
+					fmt.Printf("* ")
+					correct++
+					continue
+				}
+				fmt.Printf("%d ", grid[i][j])
+			}
+			fmt.Println()
+		}
+		fmt.Println(correct / count)
 	}
 }
