@@ -240,7 +240,8 @@ func main() {
 		votes[v] = make([]int, 10)
 	}
 	var values plotter.Values
-	for i := 0; i < 128; i++ {
+	for i := 0; i < 2048; i++ {
+		fmt.Println(i)
 		generator := Generator{
 			Query:    model.Query.Sample(&rng),
 			Key:      model.Key.Sample(&rng),
@@ -323,7 +324,11 @@ func main() {
 		values = append(values, correct/count)
 	}
 
-	w := opts[0].Output.Output.W
+	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
+	grid := make([][]int, h)
+	for j := range grid {
+		grid[j] = make([]int, w)
+	}
 	for i := range votes {
 		max, index := 0, 0
 		for j, value := range votes[i] {
@@ -331,11 +336,28 @@ func main() {
 				max, index = value, j
 			}
 		}
+		grid[i/h][i%w] = index
 		fmt.Printf("%d ", index)
 		if (i+1)%w == 0 {
 			fmt.Println()
 		}
 	}
+	fmt.Println()
+	correct, count := 0.0, 0.0
+	for i := 0; i < h; i++ {
+		for j := 0; j < w; j++ {
+			count++
+			value := int(opts[0].Output.Output.I[i*w+j].C)
+			if value == grid[i][j] {
+				fmt.Printf("* ")
+				correct++
+				continue
+			}
+			fmt.Printf("%d ", grid[i][j])
+		}
+		fmt.Println()
+	}
+	fmt.Println(correct / count)
 
 	p := plot.New()
 	p.Title.Text = "histogram plot"
