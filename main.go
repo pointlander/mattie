@@ -11,6 +11,9 @@ import (
 	"sort"
 
 	"github.com/pointlander/matrix"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
 )
 
 const (
@@ -232,7 +235,8 @@ func main() {
 		Value:    matrix.NewRandomMatrix(Input, Input),
 		Solution: matrix.NewRandomMatrix(10, opts[0].TargetSize()),
 	}
-	for i := 0; i < 33; i++ {
+	var values plotter.Values
+	for i := 0; i < 128; i++ {
 		generator := Generator{
 			Query:    model.Query.Sample(&rng),
 			Key:      model.Key.Sample(&rng),
@@ -310,5 +314,19 @@ func main() {
 			fmt.Println()
 		}
 		fmt.Println(correct / count)
+		values = append(values, correct/count)
+	}
+
+	p := plot.New()
+	p.Title.Text = "histogram plot"
+
+	hist, err := plotter.NewHist(values, 10)
+	if err != nil {
+		panic(err)
+	}
+	p.Add(hist)
+
+	if err := p.Save(8*vg.Inch, 8*vg.Inch, "histogram.png"); err != nil {
+		panic(err)
 	}
 }
