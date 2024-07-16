@@ -235,6 +235,10 @@ func main() {
 		Value:    matrix.NewRandomMatrix(Input, Input),
 		Solution: matrix.NewRandomMatrix(10, opts[0].TargetSize()),
 	}
+	votes := make([][]int, opts[0].Output.Output.H*opts[0].Output.Output.W)
+	for v := range votes {
+		votes[v] = make([]int, 10)
+	}
 	var values plotter.Values
 	for i := 0; i < 128; i++ {
 		generator := Generator{
@@ -293,10 +297,12 @@ func main() {
 		for j := 0; j < samples[0].Solution.Rows; j++ {
 			max, index := 0.0, 0
 			for k := 0; k < samples[0].Solution.Cols; k++ {
-				if value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k]); value > max {
+				value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
+				if value > max {
 					max, index = value, k
 				}
 			}
+			votes[j][index]++
 			grid[j/h][j%w] = index
 		}
 		correct, count := 0.0, 0.0
@@ -315,6 +321,20 @@ func main() {
 		}
 		fmt.Println(correct / count)
 		values = append(values, correct/count)
+	}
+
+	w := opts[0].Output.Output.W
+	for i := range votes {
+		max, index := 0, 0
+		for j, value := range votes[i] {
+			if value > max {
+				max, index = value, j
+			}
+		}
+		fmt.Printf("%d ", index)
+		if (i+1)%w == 0 {
+			fmt.Println()
+		}
 	}
 
 	p := plot.New()
