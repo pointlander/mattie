@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 
 	"github.com/pointlander/matrix"
@@ -256,15 +257,16 @@ func main() {
 			samples[i].Solution = generator.Solution.Sample()
 		}
 
-		for i := range samples {
+		done := make(chan bool, 8)
+		process := func(sample *Sample) {
 			opts := GetTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
-				for j := 0; j < samples[i].Solution.Rows; j++ {
+				for j := 0; j < sample.Solution.Rows; j++ {
 					max, index := 0.0, 0
-					for k := 0; k < samples[i].Solution.Cols; k++ {
-						if value := float64(samples[i].Solution.Data[j*samples[i].Solution.Cols+k]); value > max {
+					for k := 0; k < sample.Solution.Cols; k++ {
+						if value := float64(sample.Solution.Data[j*sample.Solution.Cols+k]); value > max {
 							max, index = value, k
 						}
 					}
@@ -274,9 +276,9 @@ func main() {
 					params[j*Input+10+30+30] = 1
 				}
 				out := matrix.SelfAttention(
-					samples[i].Query.MulT(opt.Opt),
-					samples[i].Key.MulT(opt.Opt),
-					samples[i].Value.MulT(opt.Opt))
+					sample.Query.MulT(opt.Opt),
+					sample.Key.MulT(opt.Opt),
+					sample.Value.MulT(opt.Opt))
 				for j := 0; j < out.Rows; j++ {
 					for k := 0; k < out.Cols; k++ {
 						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
@@ -284,8 +286,27 @@ func main() {
 					}
 				}
 			}
-			samples[i].Cost = sum
+			sample.Cost = sum
+			done <- true
 		}
+		flight, index, cpus := 0, 0, runtime.NumCPU()
+		for flight < cpus && index < len(samples) {
+			go process(&samples[index])
+			index++
+			flight++
+		}
+		for index < len(samples) {
+			<-done
+			flight--
+
+			go process(&samples[index])
+			index++
+			flight++
+		}
+		for i := 0; i < flight; i++ {
+			<-done
+		}
+
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
 		})
@@ -354,6 +375,14 @@ func main() {
 				continue
 			}
 			fmt.Printf("%d ", grid[i][j])
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+	for i := 0; i < h; i++ {
+		for j := 0; j < w; j++ {
+			value := int(opts[0].Output.Output.I[i*w+j].C)
+			fmt.Printf("%d ", value)
 		}
 		fmt.Println()
 	}
