@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -240,7 +241,7 @@ func main() {
 	for v := range votes {
 		votes[v] = make([]int, 10)
 	}
-	var values plotter.Values
+	var auto, acc plotter.Values
 	for i := 0; i < 2048; i++ {
 		fmt.Println(i)
 		generator := Generator{
@@ -342,7 +343,8 @@ func main() {
 			fmt.Println()
 		}
 		fmt.Println(correct / count)
-		values = append(values, correct/count)
+		auto = append(auto, samples[0].Cost)
+		acc = append(acc, correct/count)
 	}
 
 	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
@@ -389,15 +391,48 @@ func main() {
 	fmt.Println(correct / count)
 
 	p := plot.New()
-	p.Title.Text = "histogram plot"
+	p.Title.Text = "acc histogram plot"
 
-	hist, err := plotter.NewHist(values, 10)
+	hist, err := plotter.NewHist(acc, 10)
 	if err != nil {
 		panic(err)
 	}
 	p.Add(hist)
 
-	if err := p.Save(8*vg.Inch, 8*vg.Inch, "histogram.png"); err != nil {
+	err = p.Save(8*vg.Inch, 8*vg.Inch, "acc_histogram.png")
+	if err != nil {
 		panic(err)
 	}
+
+	p = plot.New()
+	p.Title.Text = "auto histogram plot"
+
+	hist, err = plotter.NewHist(auto, 10)
+	if err != nil {
+		panic(err)
+	}
+	p.Add(hist)
+
+	err = p.Save(8*vg.Inch, 8*vg.Inch, "auto_histogram.png")
+	if err != nil {
+		panic(err)
+	}
+
+	x, y, xy, xx, yy := 0.0, 0.0, 0.0, 0.0, 0.0
+	for i, X := range acc {
+		Y := auto[i]
+		x += X
+		y += Y
+		xy += X * Y
+		xx += X * X
+		yy += Y * Y
+	}
+	length := float64(len(acc))
+	x /= length
+	y /= length
+	xy /= length
+	xx /= length
+	yy /= length
+	corr := (xy - x*y) / (math.Sqrt(xx-x*x) * math.Sqrt(yy-y*y))
+	fmt.Println("corr", corr)
 }
