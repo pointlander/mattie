@@ -242,7 +242,7 @@ func main() {
 		votes[v] = make([]int, 10)
 	}
 	var auto, acc plotter.Values
-	for i := 0; i < 2048; i++ {
+	for i := 0; i < 4096; i++ {
 		fmt.Println(i)
 		generator := Generator{
 			Query:    model.Query.Sample(&rng),
