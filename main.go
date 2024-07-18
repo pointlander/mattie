@@ -242,7 +242,7 @@ func main() {
 		votes[v] = make([]int, 10)
 	}
 	var auto, acc plotter.Values
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 8*1024; i++ {
 		fmt.Println(i)
 		generator := Generator{
 			Query:    model.Query.Sample(&rng),
@@ -346,11 +346,11 @@ func main() {
 		auto = append(auto, samples[0].Cost)
 		acc = append(acc, correct/count)
 
-		for i := 0; i < model.Solution.Rows; i++ {
+		/*for i := 0; i < model.Solution.Rows; i++ {
 			for j := 0; j < model.Solution.Cols; j++ {
 				model.Solution.Data[i*model.Solution.Cols+j].StdDev = float64(votes[i][j])
 			}
-		}
+		}*/
 	}
 
 	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
