@@ -251,7 +251,7 @@ func main() {
 		stats[v] = make([]Stat, 10)
 	}
 	var auto, acc plotter.Values
-	for i := 0; i < 2*1024; i++ {
+	for i := 0; i < 4*1024; i++ {
 		fmt.Println(i)
 		samples := make([]Sample, 16)
 		for i := range samples {
@@ -287,23 +287,23 @@ func main() {
 					params[j*Input+10+30+j/opt.Output.Output.H] = 1
 					params[j*Input+10+30+30] = 1
 				}
-				out := matrix.SelfAttention(
-					sample.Query.MulT(opt.Opt),
-					sample.Key.MulT(opt.Opt),
-					sample.Value.MulT(opt.Opt))
-				/*entropy := matrix.SelfEntropy(
+				/*out := matrix.SelfAttention(
+				sample.Query.MulT(opt.Opt),
+				sample.Key.MulT(opt.Opt),
+				sample.Value.MulT(opt.Opt))*/
+				entropy := matrix.SelfEntropy(
 					sample.Query.MulT(opt.Opt),
 					sample.Key.MulT(opt.Opt),
 					sample.Value.MulT(opt.Opt))
 				for _, value := range entropy {
 					sum += float64(value)
-				}*/
-				for j := 0; j < out.Rows; j++ {
+				}
+				/*for j := 0; j < out.Rows; j++ {
 					for k := 0; k < out.Cols; k++ {
 						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
-						sum += float64(diff * diff)
+						sum += float64(diff*diff)
 					}
-				}
+				}*/
 			}
 			sample.Cost = sum
 			done <- true
