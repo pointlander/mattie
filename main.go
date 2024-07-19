@@ -226,6 +226,13 @@ type Sample struct {
 	Grid     [][]int
 }
 
+// Stat is a statistic
+type Stat struct {
+	Count      float64
+	Sum        float64
+	SumSquared float64
+}
+
 func main() {
 	rng := matrix.Rand(1)
 	sets := Load()
@@ -238,20 +245,23 @@ func main() {
 		Solution: matrix.NewRandomMatrix(10, opts[0].TargetSize()),
 	}
 	votes := make([][]int, opts[0].Output.Output.H*opts[0].Output.Output.W)
+	stats := make([][]Stat, opts[0].Output.Output.H*opts[0].Output.Output.W)
 	for v := range votes {
 		votes[v] = make([]int, 10)
+		stats[v] = make([]Stat, 10)
 	}
 	var auto, acc plotter.Values
 	for i := 0; i < 8*1024; i++ {
 		fmt.Println(i)
-		generator := Generator{
-			Query:    model.Query.Sample(&rng),
-			Key:      model.Key.Sample(&rng),
-			Value:    model.Value.Sample(&rng),
-			Solution: model.Solution.Sample(&rng),
-		}
 		samples := make([]Sample, 33)
 		for i := range samples {
+			generator := Generator{
+				Query:    model.Query.Sample(&rng),
+				Key:      model.Key.Sample(&rng),
+				Value:    model.Value.Sample(&rng),
+				Solution: model.Solution.Sample(&rng),
+			}
+
 			samples[i].Query = generator.Query.Sample()
 			samples[i].Key = generator.Key.Sample()
 			samples[i].Value = generator.Value.Sample()
@@ -280,6 +290,13 @@ func main() {
 					sample.Query.MulT(opt.Opt),
 					sample.Key.MulT(opt.Opt),
 					sample.Value.MulT(opt.Opt))
+				/*entropy := matrix.SelfEntropy(
+					sample.Query.MulT(opt.Opt),
+					sample.Key.MulT(opt.Opt),
+					sample.Value.MulT(opt.Opt))
+				for _, value := range entropy {
+					sum += float64(value)
+				}*/
 				for j := 0; j < out.Rows; j++ {
 					for k := 0; k < out.Cols; k++ {
 						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
@@ -292,7 +309,8 @@ func main() {
 		}
 		flight, index, cpus := 0, 0, runtime.NumCPU()
 		for flight < cpus && index < len(samples) {
-			go process(&samples[index])
+			sample := &samples[index]
+			go process(sample)
 			index++
 			flight++
 		}
@@ -300,7 +318,8 @@ func main() {
 			<-done
 			flight--
 
-			go process(&samples[index])
+			sample := &samples[index]
+			go process(sample)
 			index++
 			flight++
 		}
@@ -325,6 +344,9 @@ func main() {
 					max, index = value, k
 				}
 			}
+			stats[j][index].Count++
+			stats[j][index].Sum += max
+			stats[j][index].SumSquared += max * max
 			votes[j][index]++
 			grid[j/h][j%w] = index
 		}
@@ -346,11 +368,15 @@ func main() {
 		auto = append(auto, samples[0].Cost)
 		acc = append(acc, correct/count)
 
-		/*for i := 0; i < model.Solution.Rows; i++ {
-			for j := 0; j < model.Solution.Cols; j++ {
-				model.Solution.Data[i*model.Solution.Cols+j].StdDev = float64(votes[i][j])
-			}
-		}*/
+		//for i := 0; i < model.Solution.Rows; i++ {
+		//	for j := 0; j < model.Solution.Cols; j++ {
+		//avg := stats[i][j].Sum / stats[i][j].Count
+		//model.Solution.Data[i*model.Solution.Cols+j].Mean = avg
+		//model.Solution.Data[i*model.Solution.Cols+j].StdDev =
+		//	math.Sqrt(stats[i][j].SumSquared/stats[i][j].Count - avg*avg)
+		//		model.Solution.Data[i*model.Solution.Cols+j].StdDev = float64(votes[i][j])
+		//	}
+		//}
 	}
 
 	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
