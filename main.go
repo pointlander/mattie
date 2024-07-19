@@ -251,9 +251,9 @@ func main() {
 		stats[v] = make([]Stat, 10)
 	}
 	var auto, acc plotter.Values
-	for i := 0; i < 8*1024; i++ {
+	for i := 0; i < 2*1024; i++ {
 		fmt.Println(i)
-		samples := make([]Sample, 33)
+		samples := make([]Sample, 16)
 		for i := range samples {
 			generator := Generator{
 				Query:    model.Query.Sample(&rng),
@@ -275,9 +275,10 @@ func main() {
 			for _, opt := range opts {
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < sample.Solution.Rows; j++ {
-					max, index := 0.0, 0
+					max, index := -math.MaxFloat64, 0
 					for k := 0; k < sample.Solution.Cols; k++ {
-						if value := float64(sample.Solution.Data[j*sample.Solution.Cols+k]); value > max {
+						value := float64(sample.Solution.Data[j*sample.Solution.Cols+k])
+						if value > max {
 							max, index = value, k
 						}
 					}
@@ -337,7 +338,7 @@ func main() {
 			grid[j] = make([]int, w)
 		}
 		for j := 0; j < samples[0].Solution.Rows; j++ {
-			max, index := 0.0, 0
+			max, index := -math.MaxFloat64, 0
 			for k := 0; k < samples[0].Solution.Cols; k++ {
 				value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
 				if value > max {
