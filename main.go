@@ -253,7 +253,7 @@ func main() {
 	var auto, acc plotter.Values
 	for i := 0; i < 4*1024; i++ {
 		fmt.Println(i)
-		samples := make([]Sample, 16)
+		samples := make([]Sample, 8)
 		for i := range samples {
 			generator := Generator{
 				Query:    model.Query.Sample(&rng),
