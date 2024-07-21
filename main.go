@@ -434,6 +434,14 @@ func main() {
 		}
 		fmt.Println()
 	}
+	for i := 0; i < model.Solution.Rows; i++ {
+		for j := 0; j < model.Solution.Cols; j++ {
+			avg := stats[i][j].Sum / stats[i][j].Count
+			stddev := math.Sqrt(stats[i][j].SumSquared/stats[i][j].Count - avg*avg)
+			fmt.Printf("%f ", avg/stddev)
+		}
+		fmt.Println()
+	}
 	fmt.Println(correct / count)
 
 	p := plot.New()
