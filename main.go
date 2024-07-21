@@ -101,7 +101,7 @@ func (o Opt) TargetSize() int {
 }
 
 // GetTrainingData gets the training data
-func GetTrainingData(sets []Set, s, t int) (opt []Opt) {
+func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [10]int) {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
 	for _, t := range set.Train {
@@ -177,12 +177,14 @@ func GetTrainingData(sets []Set, s, t int) (opt []Opt) {
 	for i, pair := range train {
 		index := 0
 		for _, p := range pair.Input.I {
+			w[p.C]++
 			opt[i].Opt.Data[index+int(p.C)] = 1
 			opt[i].Opt.Data[index+10+p.X] = 1
 			opt[i].Opt.Data[index+10+30+p.Y] = 1
 			index += Input
 		}
 		for _, p := range pair.Output.I {
+			w[p.C]++
 			opt[i].Opt.Data[index+int(p.C)] = 1
 			opt[i].Opt.Data[index+10+p.X] = 1
 			opt[i].Opt.Data[index+10+30+p.Y] = 1
@@ -191,13 +193,14 @@ func GetTrainingData(sets []Set, s, t int) (opt []Opt) {
 		}
 
 		for _, p := range test[t].Input.I {
+			w[p.C]++
 			opt[i].Opt.Data[index+int(p.C)] = 1
 			opt[i].Opt.Data[index+10+p.X] = 1
 			opt[i].Opt.Data[index+10+30+p.Y] = 1
 			index += Input
 		}
 	}
-	return opt
+	return opt, w
 }
 
 // Model model is the random matrix model
@@ -237,7 +240,7 @@ func main() {
 	rng := matrix.Rand(1)
 	sets := Load()
 	_ = sets
-	opts := GetTrainingData(sets, 0, 0)
+	opts, ww := GetTrainingData(sets, 0, 0)
 	model := Model{
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
@@ -270,7 +273,7 @@ func main() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opts := GetTrainingData(sets, 0, 0)
+			opts, _ := GetTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
@@ -385,9 +388,11 @@ func main() {
 	for j := range grid {
 		grid[j] = make([]int, w)
 	}
+	counts := make([]int, 10)
 	for i := range votes {
 		max, index := 0, 0
 		for j, value := range votes[i] {
+			counts[j] += value
 			if value > max {
 				max, index = value, j
 			}
@@ -398,6 +403,14 @@ func main() {
 			fmt.Println()
 		}
 	}
+	for i, count := range counts {
+		if ww[i] == 0 {
+			fmt.Printf("0 ")
+			continue
+		}
+		fmt.Printf("%d ", count/ww[i])
+	}
+	fmt.Println()
 	fmt.Println()
 	correct, count := 0.0, 0.0
 	for i := 0; i < h; i++ {
