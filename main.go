@@ -203,6 +203,127 @@ func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [10]int) {
 	return opt, w
 }
 
+// OptSingle is an optimization
+type OptSingle struct {
+	Count  int
+	Opt    matrix.Matrix
+	Input  Pair
+	Output Pair
+}
+
+// TargetOffset is the target offset
+func (o OptSingle) TargetOffset() int {
+	return o.Count*(len(o.Input.Input.I)+len(o.Input.Output.I)) + len(o.Output.Input.I)
+}
+
+// TargetSize is the size of the target
+func (o OptSingle) TargetSize() int {
+	return len(o.Output.Output.I)
+}
+
+// GetSingleTrainingData gets the training data
+func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
+	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
+	set := sets[s]
+	for _, t := range set.Train {
+		pair := Pair{
+			Class: s,
+			Input: Image{
+				W: len(t.Input[0]),
+				H: len(t.Input),
+			},
+			Output: Image{
+				W: len(t.Output[0]),
+				H: len(t.Output),
+			},
+		}
+		for j, v := range t.Input {
+			for i := range v {
+				pair.Input.I = append(pair.Input.I, Pixel{
+					C: v[i],
+					X: i,
+					Y: j,
+				})
+			}
+		}
+		for j, v := range t.Output {
+			for i := range v {
+				pair.Output.I = append(pair.Output.I, Pixel{
+					C: v[i],
+					X: i,
+					Y: j,
+				})
+			}
+		}
+		train = append(train, pair)
+	}
+	for _, t := range set.Test {
+		pair := Pair{
+			Class: s,
+			Input: Image{
+				W: len(t.Input[0]),
+				H: len(t.Input),
+			},
+			Output: Image{
+				W: len(t.Output[0]),
+				H: len(t.Output),
+			},
+		}
+		for j, v := range t.Input {
+			for i := range v {
+				pair.Input.I = append(pair.Input.I, Pixel{
+					C: v[i],
+					X: i,
+					Y: j,
+				})
+			}
+		}
+		for j, v := range t.Output {
+			for i := range v {
+				pair.Output.I = append(pair.Output.I, Pixel{
+					C: v[i],
+					X: i,
+					Y: j,
+				})
+			}
+		}
+		test = append(test, pair)
+	}
+	opt = make([]OptSingle, 1)
+	opt[0].Count = len(train)
+	for i := range opt {
+		opt[i].Input = train[i]
+		opt[i].Output = test[t]
+		opt[i].Opt = matrix.NewZeroMatrix(Input, opt[i].TargetOffset()+opt[i].TargetSize())
+	}
+	index := 0
+	for _, pair := range train {
+		for _, p := range pair.Input.I {
+			w[p.C]++
+			opt[0].Opt.Data[index+int(p.C)] = 1
+			opt[0].Opt.Data[index+10+p.X] = 1
+			opt[0].Opt.Data[index+10+30+p.Y] = 1
+			index += Input
+		}
+		for _, p := range pair.Output.I {
+			w[p.C]++
+			opt[0].Opt.Data[index+int(p.C)] = 1
+			opt[0].Opt.Data[index+10+p.X] = 1
+			opt[0].Opt.Data[index+10+30+p.Y] = 1
+			opt[0].Opt.Data[index+10+30+30] = 1
+			index += Input
+		}
+	}
+	for _, p := range test[t].Input.I {
+		w[p.C]++
+		opt[0].Opt.Data[index+int(p.C)] = 1
+		opt[0].Opt.Data[index+10+p.X] = 1
+		opt[0].Opt.Data[index+10+30+p.Y] = 1
+		index += Input
+	}
+	return opt, w
+}
+
 // Model model is the random matrix model
 type Model struct {
 	Query    matrix.RandomMatrix
@@ -240,7 +361,8 @@ func main() {
 	rng := matrix.Rand(1)
 	sets := Load()
 	_ = sets
-	opts, ww := GetTrainingData(sets, 0, 0)
+	//opts, ww := GetTrainingData(sets, 0, 0)
+	opts, ww := GetSingleTrainingData(sets, 0, 0)
 	model := Model{
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
@@ -273,7 +395,8 @@ func main() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opts, _ := GetTrainingData(sets, 0, 0)
+			//opts, _ := GetTrainingData(sets, 0, 0)
+			opts, _ := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
