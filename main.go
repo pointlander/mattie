@@ -326,6 +326,10 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
 
 // Model model is the random matrix model
 type Model struct {
+	W1       matrix.RandomMatrix
+	B1       matrix.RandomMatrix
+	W2       matrix.RandomMatrix
+	B2       matrix.RandomMatrix
 	Query    matrix.RandomMatrix
 	Key      matrix.RandomMatrix
 	Value    matrix.RandomMatrix
@@ -334,6 +338,10 @@ type Model struct {
 
 // Generator is a generator
 type Generator struct {
+	W1       matrix.Generator
+	B1       matrix.Generator
+	W2       matrix.Generator
+	B2       matrix.Generator
 	Query    matrix.Generator
 	Key      matrix.Generator
 	Value    matrix.Generator
@@ -342,6 +350,10 @@ type Generator struct {
 
 // Sample is a sample
 type Sample struct {
+	W1       matrix.Matrix
+	B1       matrix.Matrix
+	W2       matrix.Matrix
+	B2       matrix.Matrix
 	Query    matrix.Matrix
 	Key      matrix.Matrix
 	Value    matrix.Matrix
@@ -363,7 +375,13 @@ func main() {
 	_ = sets
 	//opts, ww := GetTrainingData(sets, 0, 0)
 	opts, ww := GetSingleTrainingData(sets, 0, 0)
+	inputSize := 10 * opts[0].Output.Input.W * opts[0].Output.Input.H
+	outputSize := 10 * opts[0].Output.Output.W * opts[0].Output.Output.H
 	model := Model{
+		W1:       matrix.NewRandomMatrix(inputSize, 4*inputSize),
+		B1:       matrix.NewRandomMatrix(4*inputSize, 1),
+		W2:       matrix.NewRandomMatrix(4*inputSize, outputSize),
+		B2:       matrix.NewRandomMatrix(outputSize, 1),
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
 		Value:    matrix.NewRandomMatrix(Input, Input),
@@ -381,12 +399,20 @@ func main() {
 		samples := make([]Sample, 8)
 		for i := range samples {
 			generator := Generator{
+				W1:       model.W1.Sample(&rng),
+				B1:       model.B1.Sample(&rng),
+				W2:       model.W2.Sample(&rng),
+				B2:       model.B2.Sample(&rng),
 				Query:    model.Query.Sample(&rng),
 				Key:      model.Key.Sample(&rng),
 				Value:    model.Value.Sample(&rng),
 				Solution: model.Solution.Sample(&rng),
 			}
 
+			samples[i].W1 = generator.W1.Sample()
+			samples[i].B1 = generator.B1.Sample()
+			samples[i].W2 = generator.W2.Sample()
+			samples[i].B2 = generator.B2.Sample()
 			samples[i].Query = generator.Query.Sample()
 			samples[i].Key = generator.Key.Sample()
 			samples[i].Value = generator.Value.Sample()
@@ -399,11 +425,17 @@ func main() {
 			opts, _ := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
+				input := matrix.NewZeroMatrix(inputSize, 1)
+				for i, value := range opt.Output.Input.I {
+					input.Data[i*10+int(value.C)] = 1
+				}
+				output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < sample.Solution.Rows; j++ {
 					max, index := -math.MaxFloat64, 0
 					for k := 0; k < sample.Solution.Cols; k++ {
-						value := float64(sample.Solution.Data[j*sample.Solution.Cols+k])
+						value := float64(output.Data[j*10+k])
+						//value := float64(sample.Solution.Data[j*sample.Solution.Cols+k])
 						if value > max {
 							max, index = value, k
 						}
@@ -463,10 +495,16 @@ func main() {
 		for j := range grid {
 			grid[j] = make([]int, w)
 		}
+		input := matrix.NewZeroMatrix(inputSize, 1)
+		for i, value := range opts[0].Output.Input.I {
+			input.Data[i*10+int(value.C)] = 1
+		}
+		output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()
 		for j := 0; j < samples[0].Solution.Rows; j++ {
 			max, index := -math.MaxFloat64, 0
 			for k := 0; k < samples[0].Solution.Cols; k++ {
-				value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
+				value := float64(output.Data[j*10+k])
+				//value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
 				if value > max {
 					max, index = value, k
 				}
