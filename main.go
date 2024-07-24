@@ -421,21 +421,21 @@ func main() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			//opts, _ := GetTrainingData(sets, 0, 0)
-			opts, _ := GetSingleTrainingData(sets, 0, 0)
+			opts, _ := GetTrainingData(sets, 0, 0)
+			//opts, _ := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
 				input := matrix.NewZeroMatrix(inputSize, 1)
 				for i, value := range opt.Output.Input.I {
 					input.Data[i*10+int(value.C)] = 1
 				}
-				output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()
+				//output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < sample.Solution.Rows; j++ {
 					max, index := -math.MaxFloat64, 0
 					for k := 0; k < sample.Solution.Cols; k++ {
-						value := float64(output.Data[j*10+k])
-						//value := float64(sample.Solution.Data[j*sample.Solution.Cols+k])
+						//value := float64(output.Data[j*10+k])
+						value := float64(sample.Solution.Data[j*sample.Solution.Cols+k])
 						if value > max {
 							max, index = value, k
 						}
@@ -499,12 +499,12 @@ func main() {
 		for i, value := range opts[0].Output.Input.I {
 			input.Data[i*10+int(value.C)] = 1
 		}
-		output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()
+		//output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()
 		for j := 0; j < samples[0].Solution.Rows; j++ {
 			max, index := -math.MaxFloat64, 0
 			for k := 0; k < samples[0].Solution.Cols; k++ {
-				value := float64(output.Data[j*10+k])
-				//value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
+				//value := float64(output.Data[j*10+k])
+				value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
 				if value > max {
 					max, index = value, k
 				}
