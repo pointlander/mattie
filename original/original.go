@@ -422,8 +422,8 @@ func Original() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opts, _ := GetTrainingData(sets, 0, 0)
-			//opts, _ := GetSingleTrainingData(sets, 0, 0)
+			//opts, _ := GetTrainingData(sets, 0, 0)
+			opts, _ := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
 				input := matrix.NewZeroMatrix(inputSize, 1)
