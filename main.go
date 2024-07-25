@@ -8,11 +8,14 @@ import (
 	"flag"
 
 	"github.com/pointlander/mattie/original"
+	"github.com/pointlander/mattie/random"
 )
 
 var (
 	// FlagOriginal original mode
 	FlagOriginal = flag.Bool("original", false, "original mode")
+	// RandomMode random mode
+	FlagRandom = flag.Bool("random", false, "random mode")
 )
 
 func main() {
@@ -20,6 +23,9 @@ func main() {
 
 	if *FlagOriginal {
 		original.Original()
+		return
+	} else if *FlagRandom {
+		random.Random()
 		return
 	}
 }
