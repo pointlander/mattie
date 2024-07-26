@@ -360,6 +360,9 @@ type Stat struct {
 	SumSquared float64
 }
 
+// State is a markov state
+type State [3]byte
+
 // Original mode
 func Random() {
 	rng := matrix.Rand(1)
@@ -386,6 +389,7 @@ func Random() {
 		votes[v] = make([]int, 10)
 		stats[v] = make([]Stat, 10)
 	}
+	markov, state := make(map[State][10]int), State{}
 	var auto, acc plotter.Values
 	for i := 0; i < 4*1024; i++ {
 		fmt.Println(i)
@@ -514,6 +518,25 @@ func Random() {
 		correct, count := 0.0, 0.0
 		for i := 0; i < h; i++ {
 			for j := 0; j < w; j++ {
+				context := 0
+				state = State{}
+				for x := 0; x < 2; x++ {
+					for y := 0; y < 2; y++ {
+						if x == 0 && y == 0 {
+							continue
+						}
+						xx, yy := i-x, j-y
+						if xx < 0 || yy < 0 {
+							context++
+							continue
+						}
+						state[context] = byte(grid[xx][yy] & 0xFF)
+						context++
+					}
+				}
+				s := markov[state]
+				s[grid[i][j]]++
+				markov[state] = s
 				count++
 				value := int(opts[0].Output.Output.I[i*w+j].C)
 				if value == grid[i][j] {
@@ -598,6 +621,31 @@ func Random() {
 			fmt.Printf("%f ", avg/stddev)
 		}
 		fmt.Println()
+	}
+	type Context struct {
+		State        State
+		Distribution [10]int
+	}
+	contexts := make([]Context, 0, len(markov))
+	fmt.Println()
+	for key, value := range markov {
+		contexts = append(contexts, Context{
+			State:        key,
+			Distribution: value,
+		})
+	}
+	sort.Slice(contexts, func(i, j int) bool {
+		for k := range contexts[i].State {
+			if contexts[i].State[k] < contexts[j].State[k] {
+				return true
+			} else if contexts[i].State[k] > contexts[j].State[k] {
+				return false
+			}
+		}
+		return false
+	})
+	for _, value := range contexts {
+		fmt.Println(value.State, value.Distribution)
 	}
 	fmt.Println(correct / count)
 
