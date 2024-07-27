@@ -19,6 +19,18 @@ import (
 )
 
 const (
+	Reset   = "\033[0m"
+	Red     = "\033[31m"
+	Green   = "\033[32m"
+	Yellow  = "\033[33m"
+	Blue    = "\033[34m"
+	Magenta = "\033[35m"
+	Cyan    = "\033[36m"
+	Gray    = "\033[37m"
+	White   = "\033[97m"
+)
+
+const (
 	Input = 10 + 7 + 1
 )
 
@@ -527,6 +539,7 @@ func Random() {
 						}
 						xx, yy := i-x, j-y
 						if xx < 0 || yy < 0 {
+							state[context] = byte(10 & 0xFF)
 							context++
 							continue
 						}
@@ -681,6 +694,7 @@ func Random() {
 						}
 						xx, yy := i-x, j-y
 						if xx < 0 || yy < 0 {
+							state[context] = byte(10 & 0xFF)
 							context++
 							continue
 						}
@@ -749,7 +763,7 @@ func Random() {
 			value := int(opts[0].Output.Output.I[i*w+j].C)
 			if value == grid[i][j] {
 				correct2++
-				fmt.Printf("* ")
+				fmt.Printf(Blue+"%d "+Reset, grid[i][j])
 				continue
 			}
 			fmt.Printf("%d ", grid[i][j])
