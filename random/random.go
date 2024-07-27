@@ -722,6 +722,42 @@ func Random() {
 		sample = optimizer.Iterate()
 		fmt.Println(i, sample.Cost)
 	}
+	x1 := sample.Vars[0][0].Sample()
+	y1 := sample.Vars[0][1].Sample()
+	z1 := sample.Vars[0][2].Sample()
+	weights := x1.Add(y1.H(z1))
+	grid = make([][]int, h)
+	for j := range grid {
+		grid[j] = make([]int, w)
+	}
+	for i := 0; i < h; i++ {
+		for j := 0; j < w; j++ {
+			max, index := -float32(math.MaxFloat32), 0
+			for k := 0; k < 10; k++ {
+				value := weights.Data[(i*w+j)*10+k]
+				if value > max {
+					max, index = value, k
+				}
+			}
+			grid[i][j] = index
+		}
+	}
+	correct2, count2 := 0.0, 0.0
+	for i := 0; i < h; i++ {
+		for j := 0; j < w; j++ {
+			count2++
+			value := int(opts[0].Output.Output.I[i*w+j].C)
+			if value == grid[i][j] {
+				correct2++
+				fmt.Printf("* ")
+				continue
+			}
+			fmt.Printf("%d ", grid[i][j])
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+	fmt.Println(correct2 / count2)
 	fmt.Println(correct / count)
 
 	p := plot.New()
