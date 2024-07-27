@@ -647,6 +647,81 @@ func Random() {
 	for _, value := range contexts {
 		fmt.Println(value.State, value.Distribution)
 	}
+	done := make(chan bool, 8)
+	process := func(sample *matrix.Sample) {
+		x1 := sample.Vars[0][0].Sample()
+		y1 := sample.Vars[0][1].Sample()
+		z1 := sample.Vars[0][2].Sample()
+		weights := x1.Add(y1.H(z1))
+		grid := make([][]int, h)
+		for j := range grid {
+			grid[j] = make([]int, w)
+		}
+		for i := 0; i < h; i++ {
+			for j := 0; j < w; j++ {
+				max, index := -float32(math.MaxFloat32), 0
+				for k := 0; k < 10; k++ {
+					value := weights.Data[(i*w+j)*10+k]
+					if value > max {
+						max, index = value, k
+					}
+				}
+				grid[i][j] = index
+			}
+		}
+		sum := 0.0
+		for i := 0; i < h; i++ {
+			for j := 0; j < w; j++ {
+				context := 0
+				state = State{}
+				for x := 0; x < 2; x++ {
+					for y := 0; y < 2; y++ {
+						if x == 0 && y == 0 {
+							continue
+						}
+						xx, yy := i-x, j-y
+						if xx < 0 || yy < 0 {
+							context++
+							continue
+						}
+						state[context] = byte(grid[xx][yy] & 0xFF)
+						context++
+					}
+				}
+				s := markov[state]
+				sum += float64(s[grid[i][j]])
+			}
+		}
+		sample.Cost = -sum
+		done <- true
+	}
+	optimizer := matrix.NewOptimizer(&rng, 9, .1, 1, func(samples []matrix.Sample, x ...matrix.Matrix) {
+		index, flight, cpus := 0, 0, runtime.NumCPU()
+		for flight < cpus && index < len(samples) {
+			go process(&samples[index])
+			index++
+			flight++
+		}
+		for index < len(samples) {
+			<-done
+			flight--
+			fmt.Printf(".")
+
+			go process(&samples[index])
+			index++
+			flight++
+		}
+		for i := 0; i < flight; i++ {
+			<-done
+			fmt.Printf(".")
+		}
+		fmt.Printf("\n")
+	}, matrix.NewCoord(10, opts[0].TargetOffset()+opts[0].TargetSize()))
+	var sample matrix.Sample
+	for i := 0; i < 33; i++ {
+		sample = optimizer.Iterate()
+		fmt.Println(i, sample.Cost)
+	}
 	fmt.Println(correct / count)
 
 	p := plot.New()
