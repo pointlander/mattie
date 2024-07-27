@@ -19,6 +19,18 @@ import (
 )
 
 const (
+	Reset   = "\033[0m"
+	Red     = "\033[31m"
+	Green   = "\033[32m"
+	Yellow  = "\033[33m"
+	Blue    = "\033[34m"
+	Magenta = "\033[35m"
+	Cyan    = "\033[36m"
+	Gray    = "\033[37m"
+	White   = "\033[97m"
+)
+
+const (
 	Input = 10 + 30 + 30 + 1
 )
 
@@ -369,6 +381,9 @@ type Stat struct {
 	SumSquared float64
 }
 
+// State is a markov state
+type State [3]byte
+
 // Original mode
 func Original() {
 	rng := matrix.Rand(1)
@@ -394,6 +409,7 @@ func Original() {
 		votes[v] = make([]int, 10)
 		stats[v] = make([]Stat, 10)
 	}
+	markov, state := make(map[State][10]int), State{}
 	var auto, acc plotter.Values
 	for i := 0; i < 4*1024; i++ {
 		fmt.Println(i)
@@ -519,6 +535,26 @@ func Original() {
 		correct, count := 0.0, 0.0
 		for i := 0; i < h; i++ {
 			for j := 0; j < w; j++ {
+				context := 0
+				state = State{}
+				for x := 0; x < 2; x++ {
+					for y := 0; y < 2; y++ {
+						if x == 0 && y == 0 {
+							continue
+						}
+						xx, yy := i-x, j-y
+						if xx < 0 || yy < 0 {
+							state[context] = byte(10 & 0xFF)
+							context++
+							continue
+						}
+						state[context] = byte(grid[xx][yy] & 0xFF)
+						context++
+					}
+				}
+				s := markov[state]
+				s[grid[i][j]]++
+				markov[state] = s
 				count++
 				value := int(opts[0].Output.Output.I[i*w+j].C)
 				if value == grid[i][j] {
@@ -604,6 +640,143 @@ func Original() {
 		}
 		fmt.Println()
 	}
+	type Context struct {
+		State        State
+		Distribution [10]int
+	}
+	contexts := make([]Context, 0, len(markov))
+	fmt.Println()
+	for key, value := range markov {
+		contexts = append(contexts, Context{
+			State:        key,
+			Distribution: value,
+		})
+	}
+	sort.Slice(contexts, func(i, j int) bool {
+		for k := range contexts[i].State {
+			if contexts[i].State[k] < contexts[j].State[k] {
+				return true
+			} else if contexts[i].State[k] > contexts[j].State[k] {
+				return false
+			}
+		}
+		return false
+	})
+	for _, value := range contexts {
+		fmt.Println(value.State, value.Distribution)
+	}
+	done := make(chan bool, 8)
+	process := func(sample *matrix.Sample) {
+		x1 := sample.Vars[0][0].Sample()
+		y1 := sample.Vars[0][1].Sample()
+		z1 := sample.Vars[0][2].Sample()
+		weights := x1.Add(y1.H(z1))
+		grid := make([][]int, h)
+		for j := range grid {
+			grid[j] = make([]int, w)
+		}
+		for i := 0; i < h; i++ {
+			for j := 0; j < w; j++ {
+				max, index := -float32(math.MaxFloat32), 0
+				for k := 0; k < 10; k++ {
+					value := weights.Data[(i*w+j)*10+k]
+					if value > max {
+						max, index = value, k
+					}
+				}
+				grid[i][j] = index
+			}
+		}
+		sum := 0.0
+		for i := 0; i < h; i++ {
+			for j := 0; j < w; j++ {
+				context := 0
+				state = State{}
+				for x := 0; x < 2; x++ {
+					for y := 0; y < 2; y++ {
+						if x == 0 && y == 0 {
+							continue
+						}
+						xx, yy := i-x, j-y
+						if xx < 0 || yy < 0 {
+							state[context] = byte(10 & 0xFF)
+							context++
+							continue
+						}
+						state[context] = byte(grid[xx][yy] & 0xFF)
+						context++
+					}
+				}
+				s := markov[state]
+				sum += float64(s[grid[i][j]])
+			}
+		}
+		sample.Cost = -sum
+		done <- true
+	}
+	optimizer := matrix.NewOptimizer(&rng, 9, .1, 1, func(samples []matrix.Sample, x ...matrix.Matrix) {
+		index, flight, cpus := 0, 0, runtime.NumCPU()
+		for flight < cpus && index < len(samples) {
+			go process(&samples[index])
+			index++
+			flight++
+		}
+		for index < len(samples) {
+			<-done
+			flight--
+			fmt.Printf(".")
+
+			go process(&samples[index])
+			index++
+			flight++
+		}
+		for i := 0; i < flight; i++ {
+			<-done
+			fmt.Printf(".")
+		}
+		fmt.Printf("\n")
+	}, matrix.NewCoord(10, opts[0].TargetOffset()+opts[0].TargetSize()))
+	var sample matrix.Sample
+	for i := 0; i < 33; i++ {
+		sample = optimizer.Iterate()
+		fmt.Println(i, sample.Cost)
+	}
+	x1 := sample.Vars[0][0].Sample()
+	y1 := sample.Vars[0][1].Sample()
+	z1 := sample.Vars[0][2].Sample()
+	weights := x1.Add(y1.H(z1))
+	grid = make([][]int, h)
+	for j := range grid {
+		grid[j] = make([]int, w)
+	}
+	for i := 0; i < h; i++ {
+		for j := 0; j < w; j++ {
+			max, index := -float32(math.MaxFloat32), 0
+			for k := 0; k < 10; k++ {
+				value := weights.Data[(i*w+j)*10+k]
+				if value > max {
+					max, index = value, k
+				}
+			}
+			grid[i][j] = index
+		}
+	}
+	correct2, count2 := 0.0, 0.0
+	for i := 0; i < h; i++ {
+		for j := 0; j < w; j++ {
+			count2++
+			value := int(opts[0].Output.Output.I[i*w+j].C)
+			if value == grid[i][j] {
+				correct2++
+				fmt.Printf(Blue+"%d "+Reset, grid[i][j])
+				continue
+			}
+			fmt.Printf("%d ", grid[i][j])
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+	fmt.Println(correct2 / count2)
 	fmt.Println(correct / count)
 
 	p := plot.New()
