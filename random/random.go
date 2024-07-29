@@ -539,17 +539,17 @@ func Random() {
 			grid[j/h][j%w] = index
 		}
 		correct, count := 0.0, 0.0
-		for i := 0; i < h; i++ {
-			for j := 0; j < w; j++ {
+		for i := 0; i < w; i++ {
+			for j := 0; j < h; j++ {
 				context := 0
 				state = State{}
-				for x := 0; x < Width; x++ {
-					for y := 0; y < Height; y++ {
+				for x := -Width / 2; x < Width/2; x++ {
+					for y := -Height / 2; y < Height/2; y++ {
 						if x == 0 && y == 0 {
 							continue
 						}
-						xx, yy := i-x, j-y
-						if xx < 0 || yy < 0 {
+						xx, yy := i+x, j+y
+						if xx < 0 || yy < 0 || xx >= w || yy >= h {
 							state[context] = byte(10 & 0xFF)
 							context++
 							continue
@@ -694,17 +694,17 @@ func Random() {
 			}
 		}
 		sum := 0.0
-		for i := 0; i < h; i++ {
-			for j := 0; j < w; j++ {
+		for i := 0; i < w; i++ {
+			for j := 0; j < h; j++ {
 				context := 0
 				state = State{}
-				for x := 0; x < Width; x++ {
-					for y := 0; y < Height; y++ {
+				for x := -Width / 2; x < Width/2; x++ {
+					for y := -Height / 2; y < Height/2; y++ {
 						if x == 0 && y == 0 {
 							continue
 						}
-						xx, yy := i-x, j-y
-						if xx < 0 || yy < 0 {
+						xx, yy := i+x, j+y
+						if xx < 0 || yy < 0 || xx >= w || yy >= h {
 							state[context] = byte(10 & 0xFF)
 							context++
 							continue
