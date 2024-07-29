@@ -449,9 +449,10 @@ func Random() {
 				}
 				//output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()
 				a, b := 0, 1
-				for j := 0; j < opt.Opt.Rows-1; j++ {
-					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], sample.Order.Data[(j+a)*7:(j+a+1)*7])
-					copy(opt.Opt.Data[j*Input+10+7:j*Input+10+2*7], sample.Order.Data[(j+b)*7:(j+b+1)*7])
+				for j := 0; j < opt.Opt.Rows; j++ {
+					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
+					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], sample.Order.Data[x*7:(x+1)*7])
+					copy(opt.Opt.Data[j*Input+10+7:j*Input+10+2*7], sample.Order.Data[(y)*7:(y+1)*7])
 					a, b = b, a
 				}
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
