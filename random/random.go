@@ -31,7 +31,14 @@ const (
 )
 
 const (
+	// Input is the network input size
 	Input = 10 + 2*7 + 1
+	// Width is the width of the markov model
+	Width = 3
+	// Height is the height of the markov model
+	Height = 3
+	// Size is the size of the markov model
+	Size = Width*Height - 1
 )
 
 // Example is a learning example
@@ -373,7 +380,7 @@ type Stat struct {
 }
 
 // State is a markov state
-type State [3]byte
+type State [Size]byte
 
 // Original mode
 func Random() {
@@ -535,8 +542,8 @@ func Random() {
 			for j := 0; j < w; j++ {
 				context := 0
 				state = State{}
-				for x := 0; x < 2; x++ {
-					for y := 0; y < 2; y++ {
+				for x := 0; x < Width; x++ {
+					for y := 0; y < Height; y++ {
 						if x == 0 && y == 0 {
 							continue
 						}
@@ -690,8 +697,8 @@ func Random() {
 			for j := 0; j < w; j++ {
 				context := 0
 				state = State{}
-				for x := 0; x < 2; x++ {
-					for y := 0; y < 2; y++ {
+				for x := 0; x < Width; x++ {
+					for y := 0; y < Height; y++ {
 						if x == 0 && y == 0 {
 							continue
 						}
