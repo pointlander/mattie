@@ -31,7 +31,7 @@ const (
 )
 
 const (
-	Input = 10 + 7 + 1
+	Input = 10 + 2*7 + 1
 )
 
 // Example is a learning example
@@ -196,7 +196,7 @@ func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [10]int) {
 		for _, p := range pair.Output.I {
 			w[p.C]++
 			opt[i].Opt.Data[index+int(p.C)] = 1
-			opt[i].Opt.Data[index+10+7] = 1
+			opt[i].Opt.Data[index+10+2*7] = 1
 			index += Input
 		}
 
@@ -312,7 +312,7 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
 		for _, p := range pair.Output.I {
 			w[p.C]++
 			opt[0].Opt.Data[index+int(p.C)] = 1
-			opt[0].Opt.Data[index+10+7] = 1
+			opt[0].Opt.Data[index+10+2*7] = 1
 			index += Input
 		}
 	}
@@ -441,8 +441,11 @@ func Random() {
 					input.Data[i*10+int(value.C)] = 1
 				}
 				//output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()
-				for j := 0; j < opt.Opt.Rows; j++ {
-					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], sample.Order.Data[j*7:(j+1)*7])
+				a, b := 0, 1
+				for j := 0; j < opt.Opt.Rows-1; j++ {
+					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], sample.Order.Data[(j+a)*7:(j+a+1)*7])
+					copy(opt.Opt.Data[j*Input+10+7:j*Input+10+2*7], sample.Order.Data[(j+b)*7:(j+b+1)*7])
+					a, b = b, a
 				}
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < sample.Solution.Rows; j++ {
@@ -455,7 +458,7 @@ func Random() {
 						}
 					}
 					params[j*Input+index] = 1
-					params[j*Input+10+7] = 1
+					params[j*Input+10+2*7] = 1
 				}
 				/*out := matrix.SelfAttention(
 				sample.Query.MulT(opt.Opt),
