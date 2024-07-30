@@ -443,11 +443,11 @@ func Random() {
 			opts, _ := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
-				input := matrix.NewZeroMatrix(inputSize, 1)
+				/*input := matrix.NewZeroMatrix(inputSize, 1)
 				for i, value := range opt.Output.Input.I {
 					input.Data[i*10+int(value.C)] = 1
 				}
-				//output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()
+				output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()*/
 				a, b := 0, 1
 				for j := 0; j < opt.Opt.Rows; j++ {
 					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
