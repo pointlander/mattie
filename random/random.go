@@ -741,7 +741,7 @@ func Random() {
 			fmt.Printf(".")
 		}
 		fmt.Printf("\n")
-	}, matrix.NewCoord(10, opts[0].TargetOffset()+opts[0].TargetSize()))
+	}, matrix.NewCoord(10, opts[0].TargetSize()))
 	var sample matrix.Sample
 	for i := 0; i < 33; i++ {
 		sample = optimizer.Iterate()
