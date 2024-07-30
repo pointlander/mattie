@@ -410,9 +410,10 @@ func Random() {
 	}
 	markov, state := make(map[State][10]int), State{}
 	var auto, acc plotter.Values
-	for i := 0; i < 4*1024; i++ {
+	grids := make([][][]byte, 0, 8)
+	for i := 0; i < 8*1024; i++ {
 		fmt.Println(i)
-		samples := make([]Sample, 8)
+		samples := make([]Sample, 16)
 		for i := range samples {
 			generator := Generator{
 				W1:       model.W1.Sample(&rng),
@@ -514,15 +515,15 @@ func Random() {
 		})
 		fmt.Println(samples[0].Cost)
 		h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
-		grid := make([][]int, h)
+		grid := make([][]byte, h)
 		for j := range grid {
-			grid[j] = make([]int, w)
+			grid[j] = make([]byte, w)
 		}
-		input := matrix.NewZeroMatrix(inputSize, 1)
+		/*input := matrix.NewZeroMatrix(inputSize, 1)
 		for i, value := range opts[0].Output.Input.I {
 			input.Data[i*10+int(value.C)] = 1
 		}
-		//output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()
+		output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()*/
 		for j := 0; j < samples[0].Solution.Rows; j++ {
 			max, index := -math.MaxFloat64, 0
 			for k := 0; k < samples[0].Solution.Cols; k++ {
@@ -536,11 +537,12 @@ func Random() {
 			stats[j][index].Sum += max
 			stats[j][index].SumSquared += max * max
 			votes[j][index]++
-			grid[j/h][j%w] = index
+			grid[j/h][j%w] = byte(index)
 		}
+		grids = append(grids, grid)
 		correct, count := 0.0, 0.0
-		for i := 0; i < w; i++ {
-			for j := 0; j < h; j++ {
+		for j := 0; j < h; j++ {
+			for i := 0; i < w; i++ {
 				context := 0
 				state = State{}
 				for x := -Width / 2; x < Width/2; x++ {
@@ -554,21 +556,21 @@ func Random() {
 							context++
 							continue
 						}
-						state[context] = byte(grid[xx][yy] & 0xFF)
+						state[context] = byte(grid[yy][xx] & 0xFF)
 						context++
 					}
 				}
 				s := markov[state]
-				s[grid[i][j]]++
+				s[grid[j][i]]++
 				markov[state] = s
 				count++
-				value := int(opts[0].Output.Output.I[i*w+j].C)
-				if value == grid[i][j] {
+				value := opts[0].Output.Output.I[j*w+i].C
+				if value == grid[j][i] {
 					fmt.Printf("* ")
 					correct++
 					continue
 				}
-				fmt.Printf("%d ", grid[i][j])
+				fmt.Printf("%d ", grid[j][i])
 			}
 			fmt.Println()
 		}
@@ -588,9 +590,9 @@ func Random() {
 	}
 
 	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
-	grid := make([][]int, h)
+	grid := make([][]byte, h)
 	for j := range grid {
-		grid[j] = make([]int, w)
+		grid[j] = make([]byte, w)
 	}
 	counts := make([]int, 10)
 	for i := range votes {
@@ -601,7 +603,7 @@ func Random() {
 				max, index = value, j
 			}
 		}
-		grid[i/h][i%w] = index
+		grid[i/h][i%w] = byte(index)
 		fmt.Printf("%d ", index)
 		if (i+1)%w == 0 {
 			fmt.Println()
@@ -617,23 +619,23 @@ func Random() {
 	fmt.Println()
 	fmt.Println()
 	correct, count := 0.0, 0.0
-	for i := 0; i < h; i++ {
-		for j := 0; j < w; j++ {
+	for j := 0; j < h; j++ {
+		for i := 0; i < w; i++ {
 			count++
-			value := int(opts[0].Output.Output.I[i*w+j].C)
-			if value == grid[i][j] {
+			value := opts[0].Output.Output.I[j*w+i].C
+			if value == grid[j][i] {
 				fmt.Printf("* ")
 				correct++
 				continue
 			}
-			fmt.Printf("%d ", grid[i][j])
+			fmt.Printf("%d ", grid[j][i])
 		}
 		fmt.Println()
 	}
 	fmt.Println()
-	for i := 0; i < h; i++ {
-		for j := 0; j < w; j++ {
-			value := int(opts[0].Output.Output.I[i*w+j].C)
+	for j := 0; j < h; j++ {
+		for i := 0; i < w; i++ {
+			value := int(opts[0].Output.Output.I[j*w+i].C)
 			fmt.Printf("%d ", value)
 		}
 		fmt.Println()
@@ -671,7 +673,7 @@ func Random() {
 	for _, value := range contexts {
 		fmt.Println(value.State, value.Distribution)
 	}
-	done := make(chan bool, 8)
+	/*done := make(chan bool, 8)
 	process := func(sample *matrix.Sample) {
 		x1 := sample.Vars[0][0].Sample()
 		y1 := sample.Vars[0][1].Sample()
@@ -766,18 +768,49 @@ func Random() {
 			}
 			grid[i][j] = index
 		}
+	}*/
+	var grid2 [][]byte
+	max := 0.0
+	for _, grid := range grids {
+		sum := 0.0
+		for j := 0; j < h; j++ {
+			for i := 0; i < w; i++ {
+				context := 0
+				state = State{}
+				for x := -Width / 2; x < Width/2; x++ {
+					for y := -Height / 2; y < Height/2; y++ {
+						if x == 0 && y == 0 {
+							continue
+						}
+						xx, yy := i+x, j+y
+						if xx < 0 || yy < 0 || xx >= w || yy >= h {
+							state[context] = byte(10 & 0xFF)
+							context++
+							continue
+						}
+						state[context] = byte(grid[yy][xx] & 0xFF)
+						context++
+					}
+				}
+				s := markov[state]
+				sum += float64(s[grid[j][i]])
+			}
+		}
+		if sum > max {
+			max, grid2 = sum, grid
+		}
 	}
 	correct2, count2 := 0.0, 0.0
-	for i := 0; i < h; i++ {
-		for j := 0; j < w; j++ {
+	for j := 0; j < h; j++ {
+		for i := 0; i < w; i++ {
 			count2++
-			value := int(opts[0].Output.Output.I[i*w+j].C)
-			if value == grid[i][j] {
+			value := opts[0].Output.Output.I[j*w+i].C
+			if value == grid2[j][i] {
 				correct2++
-				fmt.Printf(Blue+"%d "+Reset, grid[i][j])
+				fmt.Printf(Blue+"%d "+Reset, grid2[j][i])
 				continue
 			}
-			fmt.Printf("%d ", grid[i][j])
+			fmt.Printf("%d ", grid2[j][i])
 		}
 		fmt.Println()
 	}
