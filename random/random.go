@@ -333,10 +333,6 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
 
 // Model model is the random matrix model
 type Model struct {
-	//W1       matrix.RandomMatrix
-	//B1       matrix.RandomMatrix
-	//W2       matrix.RandomMatrix
-	//B2       matrix.RandomMatrix
 	Query    matrix.RandomMatrix
 	Key      matrix.RandomMatrix
 	Value    matrix.RandomMatrix
@@ -344,30 +340,13 @@ type Model struct {
 	Order    matrix.RandomMatrix
 }
 
-// Generator is a generator
-type Generator struct {
-	//W1       matrix.Generator
-	//B1       matrix.Generator
-	//W2       matrix.Generator
-	//B2       matrix.Generator
+// Sample is a sample
+type Sample struct {
 	Query    matrix.Generator
 	Key      matrix.Generator
 	Value    matrix.Generator
 	Solution matrix.Generator
 	Order    matrix.Generator
-}
-
-// Sample is a sample
-type Sample struct {
-	//W1       matrix.Matrix
-	//B1       matrix.Matrix
-	//W2       matrix.Matrix
-	//B2       matrix.Matrix
-	Query    matrix.Matrix
-	Key      matrix.Matrix
-	Value    matrix.Matrix
-	Solution matrix.Matrix
-	Order    matrix.Matrix
 	Cost     float64
 	Grid     [][]int
 }
@@ -389,13 +368,7 @@ func Random() {
 	_ = sets
 	//opts, ww := GetTrainingData(sets, 0, 0)
 	opts, ww := GetSingleTrainingData(sets, 0, 0)
-	//inputSize := 10 * opts[0].Output.Input.W * opts[0].Output.Input.H
-	//outputSize := 10 * opts[0].Output.Output.W * opts[0].Output.Output.H
 	model := Model{
-		//W1:       matrix.NewRandomMatrix(inputSize, 4*inputSize),
-		//B1:       matrix.NewRandomMatrix(4*inputSize, 1),
-		//W2:       matrix.NewRandomMatrix(4*inputSize, outputSize),
-		//B2:       matrix.NewRandomMatrix(outputSize, 1),
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
 		Value:    matrix.NewRandomMatrix(Input, Input),
@@ -417,27 +390,11 @@ func Random() {
 	maxReduction, cut := 0.0, 0
 	{
 		for i := range samples {
-			generator := Generator{
-				//W1:       model.W1.Sample(&rng),
-				//B1:       model.B1.Sample(&rng),
-				//W2:       model.W2.Sample(&rng),
-				//B2:       model.B2.Sample(&rng),
-				Query:    model.Query.Sample(&rng),
-				Key:      model.Key.Sample(&rng),
-				Value:    model.Value.Sample(&rng),
-				Solution: model.Solution.Sample(&rng),
-				Order:    model.Order.Sample(&rng),
-			}
-
-			//samples[i].W1 = generator.W1.Sample()
-			//samples[i].B1 = generator.B1.Sample()
-			//samples[i].W2 = generator.W2.Sample()
-			//samples[i].B2 = generator.B2.Sample()
-			samples[i].Query = generator.Query.Sample()
-			samples[i].Key = generator.Key.Sample()
-			samples[i].Value = generator.Value.Sample()
-			samples[i].Solution = generator.Solution.Sample()
-			samples[i].Order = generator.Order.Sample()
+			samples[i].Query = model.Query.Sample(&rng)
+			samples[i].Key = model.Key.Sample(&rng)
+			samples[i].Value = model.Value.Sample(&rng)
+			samples[i].Solution = model.Solution.Sample(&rng)
+			samples[i].Order = model.Order.Sample(&rng)
 		}
 
 		done := make(chan bool, 8)
@@ -451,19 +408,21 @@ func Random() {
 					input.Data[i*10+int(value.C)] = 1
 				}
 				output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()*/
+				order := sample.Order.Sample()
 				a, b := 0, 1
 				for j := 0; j < opt.Opt.Rows; j++ {
 					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], sample.Order.Data[x*7:(x+1)*7])
-					copy(opt.Opt.Data[j*Input+10+7:j*Input+10+2*7], sample.Order.Data[(y)*7:(y+1)*7])
+					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], order.Data[x*7:(x+1)*7])
+					copy(opt.Opt.Data[j*Input+10+7:j*Input+10+2*7], order.Data[(y)*7:(y+1)*7])
 					a, b = b, a
 				}
+				solution := sample.Solution.Sample()
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
-				for j := 0; j < sample.Solution.Rows; j++ {
+				for j := 0; j < solution.Rows; j++ {
 					max, index := -math.MaxFloat64, 0
-					for k := 0; k < sample.Solution.Cols; k++ {
+					for k := 0; k < solution.Cols; k++ {
 						//value := float64(output.Data[j*10+k])
-						value := float64(sample.Solution.Data[j*sample.Solution.Cols+k])
+						value := float64(solution.Data[j*solution.Cols+k])
 						if value > max {
 							max, index = value, k
 						}
@@ -475,10 +434,13 @@ func Random() {
 				sample.Query.MulT(opt.Opt),
 				sample.Key.MulT(opt.Opt),
 				sample.Value.MulT(opt.Opt))*/
+				query := sample.Query.Sample()
+				key := sample.Key.Sample()
+				value := sample.Value.Sample()
 				entropy := matrix.SelfEntropy(
-					sample.Query.MulT(opt.Opt),
-					sample.Key.MulT(opt.Opt),
-					sample.Value.MulT(opt.Opt))
+					query.MulT(opt.Opt),
+					key.MulT(opt.Opt),
+					value.MulT(opt.Opt))
 				for _, value := range entropy {
 					sum += float64(value)
 				}
@@ -564,11 +526,12 @@ func Random() {
 				input.Data[i*10+int(value.C)] = 1
 			}
 			output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()*/
-			for j := 0; j < samples[sample].Solution.Rows; j++ {
+			solution := samples[sample].Solution.Sample()
+			for j := 0; j < solution.Rows; j++ {
 				max, index := -math.MaxFloat64, 0
-				for k := 0; k < samples[sample].Solution.Cols; k++ {
+				for k := 0; k < solution.Cols; k++ {
 					//value := float64(output.Data[j*10+k])
-					value := float64(samples[sample].Solution.Data[j*samples[sample].Solution.Cols+k])
+					value := float64(solution.Data[j*solution.Cols+k])
 					if value > max {
 						max, index = value, k
 					}
