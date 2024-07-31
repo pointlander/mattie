@@ -386,7 +386,7 @@ func Random() {
 	grids := make([][][]byte, 0, 8)
 	//for i := 0; i < 4*1024; i++ {
 	//fmt.Println(i)
-	samples := make([]Sample, 128*1024)
+	samples := make([]Sample, 4*1024)
 	maxReduction, cut := 0.0, 0
 	{
 		for i := range samples {
@@ -695,9 +695,12 @@ func Random() {
 		}
 		for j := 0; j < h; j++ {
 			for i := 0; i < w; i++ {
-				max, index := -float32(math.MaxFloat32), 0
+				max, index := float32(0), 0
 				for k := 0; k < 10; k++ {
 					value := weights.Data[(j*w+i)*10+k]
+					if value < 0 {
+						value = -value
+					}
 					if value > max {
 						max, index = value, k
 					}
