@@ -677,7 +677,7 @@ func Random() {
 	for _, value := range contexts {
 		fmt.Println(value.State, value.Distribution)
 	}
-	/*done := make(chan bool, 8)
+	done := make(chan bool, 8)
 	process := func(sample *matrix.Sample) {
 		x1 := sample.Vars[0][0].Sample()
 		y1 := sample.Vars[0][1].Sample()
@@ -757,9 +757,9 @@ func Random() {
 	y1 := sample.Vars[0][1].Sample()
 	z1 := sample.Vars[0][2].Sample()
 	weights := x1.Add(y1.H(z1))
-	grid = make([][]int, h)
+	grid = make([][]byte, h)
 	for j := range grid {
-		grid[j] = make([]int, w)
+		grid[j] = make([]byte, w)
 	}
 	for i := 0; i < h; i++ {
 		for j := 0; j < w; j++ {
@@ -770,9 +770,25 @@ func Random() {
 					max, index = value, k
 				}
 			}
-			grid[i][j] = index
+			grid[i][j] = byte(index)
 		}
-	}*/
+	}
+	correct3, count3 := 0.0, 0.0
+	for j := 0; j < h; j++ {
+		for i := 0; i < w; i++ {
+			count3++
+			value := opts[0].Output.Output.I[j*w+i].C
+			if value == grid[j][i] {
+				correct3++
+				fmt.Printf(Blue+"%d "+Reset, grid[j][i])
+				continue
+			}
+			fmt.Printf("%d ", grid[j][i])
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+
 	var grid2 [][]byte
 	max := 0.0
 	for _, grid := range grids {
@@ -819,8 +835,9 @@ func Random() {
 		fmt.Println()
 	}
 	fmt.Println()
-	fmt.Println(correct2 / count2)
 	fmt.Println(correct / count)
+	fmt.Println(correct3 / count3)
+	fmt.Println(correct2 / count2)
 	fmt.Println(maxReduction, cut)
 
 	p := plot.New()
