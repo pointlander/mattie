@@ -386,7 +386,7 @@ func Random() {
 	grids := make([][][]byte, 0, 8)
 	//for i := 0; i < 4*1024; i++ {
 	//fmt.Println(i)
-	samples := make([]Sample, 64*1024)
+	samples := make([]Sample, 128*1024)
 	maxReduction, cut := 0.0, 0
 	{
 		for i := range samples {
@@ -693,21 +693,21 @@ func Random() {
 		for j := range grid {
 			grid[j] = make([]int, w)
 		}
-		for i := 0; i < h; i++ {
-			for j := 0; j < w; j++ {
+		for j := 0; j < h; j++ {
+			for i := 0; i < w; i++ {
 				max, index := -float32(math.MaxFloat32), 0
 				for k := 0; k < 10; k++ {
-					value := weights.Data[(i*w+j)*10+k]
+					value := weights.Data[(j*w+i)*10+k]
 					if value > max {
 						max, index = value, k
 					}
 				}
-				grid[i][j] = index
+				grid[j][i] = index
 			}
 		}
 		sum := 0.0
-		for i := 0; i < w; i++ {
-			for j := 0; j < h; j++ {
+		for j := 0; j < h; j++ {
+			for i := 0; i < w; i++ {
 				context := 0
 				state = State{}
 				for x := -Width / 2; x < Width/2; x++ {
@@ -721,12 +721,12 @@ func Random() {
 							context++
 							continue
 						}
-						state[context] = byte(grid[xx][yy] & 0xFF)
+						state[context] = byte(grid[yy][xx] & 0xFF)
 						context++
 					}
 				}
 				s := markov[state]
-				sum += float64(s[grid[i][j]])
+				sum += float64(s[grid[j][i]])
 			}
 		}
 		sample.Cost = -sum
@@ -767,16 +767,19 @@ func Random() {
 	for j := range grid {
 		grid[j] = make([]byte, w)
 	}
-	for i := 0; i < h; i++ {
-		for j := 0; j < w; j++ {
-			max, index := -float32(math.MaxFloat32), 0
+	for j := 0; j < h; j++ {
+		for i := 0; i < w; i++ {
+			max, index := float32(0.0), 0
 			for k := 0; k < 10; k++ {
-				value := weights.Data[(i*w+j)*10+k]
+				value := weights.Data[(j*w+i)*10+k]
+				if value < 0 {
+					value = -value
+				}
 				if value > max {
 					max, index = value, k
 				}
 			}
-			grid[i][j] = byte(index)
+			grid[j][i] = byte(index)
 		}
 	}
 	correct3, count3 := 0.0, 0.0
