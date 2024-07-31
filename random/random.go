@@ -333,10 +333,10 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
 
 // Model model is the random matrix model
 type Model struct {
-	W1       matrix.RandomMatrix
-	B1       matrix.RandomMatrix
-	W2       matrix.RandomMatrix
-	B2       matrix.RandomMatrix
+	//W1       matrix.RandomMatrix
+	//B1       matrix.RandomMatrix
+	//W2       matrix.RandomMatrix
+	//B2       matrix.RandomMatrix
 	Query    matrix.RandomMatrix
 	Key      matrix.RandomMatrix
 	Value    matrix.RandomMatrix
@@ -346,10 +346,10 @@ type Model struct {
 
 // Generator is a generator
 type Generator struct {
-	W1       matrix.Generator
-	B1       matrix.Generator
-	W2       matrix.Generator
-	B2       matrix.Generator
+	//W1       matrix.Generator
+	//B1       matrix.Generator
+	//W2       matrix.Generator
+	//B2       matrix.Generator
 	Query    matrix.Generator
 	Key      matrix.Generator
 	Value    matrix.Generator
@@ -359,10 +359,10 @@ type Generator struct {
 
 // Sample is a sample
 type Sample struct {
-	W1       matrix.Matrix
-	B1       matrix.Matrix
-	W2       matrix.Matrix
-	B2       matrix.Matrix
+	//W1       matrix.Matrix
+	//B1       matrix.Matrix
+	//W2       matrix.Matrix
+	//B2       matrix.Matrix
 	Query    matrix.Matrix
 	Key      matrix.Matrix
 	Value    matrix.Matrix
@@ -389,13 +389,13 @@ func Random() {
 	_ = sets
 	//opts, ww := GetTrainingData(sets, 0, 0)
 	opts, ww := GetSingleTrainingData(sets, 0, 0)
-	inputSize := 10 * opts[0].Output.Input.W * opts[0].Output.Input.H
-	outputSize := 10 * opts[0].Output.Output.W * opts[0].Output.Output.H
+	//inputSize := 10 * opts[0].Output.Input.W * opts[0].Output.Input.H
+	//outputSize := 10 * opts[0].Output.Output.W * opts[0].Output.Output.H
 	model := Model{
-		W1:       matrix.NewRandomMatrix(inputSize, 4*inputSize),
-		B1:       matrix.NewRandomMatrix(4*inputSize, 1),
-		W2:       matrix.NewRandomMatrix(4*inputSize, outputSize),
-		B2:       matrix.NewRandomMatrix(outputSize, 1),
+		//W1:       matrix.NewRandomMatrix(inputSize, 4*inputSize),
+		//B1:       matrix.NewRandomMatrix(4*inputSize, 1),
+		//W2:       matrix.NewRandomMatrix(4*inputSize, outputSize),
+		//B2:       matrix.NewRandomMatrix(outputSize, 1),
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
 		Value:    matrix.NewRandomMatrix(Input, Input),
@@ -411,15 +411,17 @@ func Random() {
 	markov, state := make(map[State][10]int), State{}
 	var auto, acc plotter.Values
 	grids := make([][][]byte, 0, 8)
-	for i := 0; i < 8*1024; i++ {
-		fmt.Println(i)
-		samples := make([]Sample, 16)
+	//for i := 0; i < 4*1024; i++ {
+	//fmt.Println(i)
+	samples := make([]Sample, 32*1024)
+	maxReduction, cut := 0.0, 0
+	{
 		for i := range samples {
 			generator := Generator{
-				W1:       model.W1.Sample(&rng),
-				B1:       model.B1.Sample(&rng),
-				W2:       model.W2.Sample(&rng),
-				B2:       model.B2.Sample(&rng),
+				//W1:       model.W1.Sample(&rng),
+				//B1:       model.B1.Sample(&rng),
+				//W2:       model.W2.Sample(&rng),
+				//B2:       model.B2.Sample(&rng),
 				Query:    model.Query.Sample(&rng),
 				Key:      model.Key.Sample(&rng),
 				Value:    model.Value.Sample(&rng),
@@ -427,10 +429,10 @@ func Random() {
 				Order:    model.Order.Sample(&rng),
 			}
 
-			samples[i].W1 = generator.W1.Sample()
-			samples[i].B1 = generator.B1.Sample()
-			samples[i].W2 = generator.W2.Sample()
-			samples[i].B2 = generator.B2.Sample()
+			//samples[i].W1 = generator.W1.Sample()
+			//samples[i].B1 = generator.B1.Sample()
+			//samples[i].W2 = generator.W2.Sample()
+			//samples[i].B2 = generator.B2.Sample()
 			samples[i].Query = generator.Query.Sample()
 			samples[i].Key = generator.Key.Sample()
 			samples[i].Value = generator.Value.Sample()
@@ -513,70 +515,109 @@ func Random() {
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
 		})
-		fmt.Println(samples[0].Cost)
-		h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
-		grid := make([][]byte, h)
-		for j := range grid {
-			grid[j] = make([]byte, w)
+		avg, vr := 0.0, 0.0
+		for i := 0; i < len(samples); i++ {
+			avg += samples[i].Cost
 		}
-		/*input := matrix.NewZeroMatrix(inputSize, 1)
-		for i, value := range opts[0].Output.Input.I {
-			input.Data[i*10+int(value.C)] = 1
+		avg /= float64(len(samples))
+		for i := 0; i < len(samples); i++ {
+			diff := samples[i].Cost - avg
+			vr += diff * diff
 		}
-		output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()*/
-		for j := 0; j < samples[0].Solution.Rows; j++ {
-			max, index := -math.MaxFloat64, 0
-			for k := 0; k < samples[0].Solution.Cols; k++ {
-				//value := float64(output.Data[j*10+k])
-				value := float64(samples[0].Solution.Data[j*samples[0].Solution.Cols+k])
-				if value > max {
-					max, index = value, k
-				}
+		vr /= float64(len(samples))
+		for i := 1; i < len(samples)-1; i++ {
+			avga, avgb := 0.0, 0.0
+			vara, varb := 0.0, 0.0
+			for j := 0; j < i; j++ {
+				avga += samples[j].Cost
 			}
-			stats[j][index].Count++
-			stats[j][index].Sum += max
-			stats[j][index].SumSquared += max * max
-			votes[j][index]++
-			grid[j/h][j%w] = byte(index)
+			avga /= float64(i)
+			for j := 0; j < i; j++ {
+				diff := samples[j].Cost - avga
+				vara += diff * diff
+			}
+			vara /= float64(i)
+			for j := i; j < len(samples); j++ {
+				avgb += samples[j].Cost
+			}
+			avgb /= float64(len(samples) - i)
+			for j := i; j < len(samples); j++ {
+				diff := samples[j].Cost - avgb
+				varb += diff * diff
+			}
+			varb /= float64(len(samples) - i)
+			reduction := vr - (vara + varb)
+			if reduction > maxReduction {
+				maxReduction, cut = reduction, i
+			}
 		}
-		grids = append(grids, grid)
-		correct, count := 0.0, 0.0
-		for j := 0; j < h; j++ {
-			for i := 0; i < w; i++ {
-				context := 0
-				state = State{}
-				for x := -Width / 2; x < Width/2; x++ {
-					for y := -Height / 2; y < Height/2; y++ {
-						if x == 0 && y == 0 {
-							continue
-						}
-						xx, yy := i+x, j+y
-						if xx < 0 || yy < 0 || xx >= w || yy >= h {
-							state[context] = byte(10 & 0xFF)
-							context++
-							continue
-						}
-						state[context] = byte(grid[yy][xx] & 0xFF)
-						context++
+		samples = samples[:cut]
+		for sample := range samples {
+			//fmt.Println(samples[0].Cost)
+			h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
+			grid := make([][]byte, h)
+			for j := range grid {
+				grid[j] = make([]byte, w)
+			}
+			/*input := matrix.NewZeroMatrix(inputSize, 1)
+			for i, value := range opts[0].Output.Input.I {
+				input.Data[i*10+int(value.C)] = 1
+			}
+			output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()*/
+			for j := 0; j < samples[sample].Solution.Rows; j++ {
+				max, index := -math.MaxFloat64, 0
+				for k := 0; k < samples[sample].Solution.Cols; k++ {
+					//value := float64(output.Data[j*10+k])
+					value := float64(samples[sample].Solution.Data[j*samples[sample].Solution.Cols+k])
+					if value > max {
+						max, index = value, k
 					}
 				}
-				s := markov[state]
-				s[grid[j][i]]++
-				markov[state] = s
-				count++
-				value := opts[0].Output.Output.I[j*w+i].C
-				if value == grid[j][i] {
-					fmt.Printf("* ")
-					correct++
-					continue
-				}
-				fmt.Printf("%d ", grid[j][i])
+				stats[j][index].Count++
+				stats[j][index].Sum += max
+				stats[j][index].SumSquared += max * max
+				votes[j][index]++
+				grid[j/h][j%w] = byte(index)
 			}
-			fmt.Println()
+			grids = append(grids, grid)
+			correct, count := 0.0, 0.0
+			for j := 0; j < h; j++ {
+				for i := 0; i < w; i++ {
+					context := 0
+					state = State{}
+					for x := -Width / 2; x < Width/2; x++ {
+						for y := -Height / 2; y < Height/2; y++ {
+							if x == 0 && y == 0 {
+								continue
+							}
+							xx, yy := i+x, j+y
+							if xx < 0 || yy < 0 || xx >= w || yy >= h {
+								state[context] = byte(10 & 0xFF)
+								context++
+								continue
+							}
+							state[context] = byte(grid[yy][xx] & 0xFF)
+							context++
+						}
+					}
+					s := markov[state]
+					s[grid[j][i]]++
+					markov[state] = s
+					count++
+					value := opts[0].Output.Output.I[j*w+i].C
+					if value == grid[j][i] {
+						fmt.Printf("* ")
+						correct++
+						continue
+					}
+					fmt.Printf("%d ", grid[j][i])
+				}
+				fmt.Println()
+			}
+			fmt.Println(correct / count)
+			auto = append(auto, samples[0].Cost)
+			acc = append(acc, correct/count)
 		}
-		fmt.Println(correct / count)
-		auto = append(auto, samples[0].Cost)
-		acc = append(acc, correct/count)
 
 		//for i := 0; i < model.Solution.Rows; i++ {
 		//	for j := 0; j < model.Solution.Cols; j++ {
@@ -817,6 +858,7 @@ func Random() {
 	fmt.Println()
 	fmt.Println(correct2 / count2)
 	fmt.Println(correct / count)
+	fmt.Println(maxReduction, cut)
 
 	p := plot.New()
 	p.Title.Text = "acc histogram plot"
