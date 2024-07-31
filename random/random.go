@@ -386,7 +386,7 @@ func Random() {
 	grids := make([][][]byte, 0, 8)
 	//for i := 0; i < 4*1024; i++ {
 	//fmt.Println(i)
-	samples := make([]Sample, 32*1024)
+	samples := make([]Sample, 64*1024)
 	maxReduction, cut := 0.0, 0
 	{
 		for i := range samples {
@@ -419,10 +419,13 @@ func Random() {
 				solution := sample.Solution.Sample()
 				params := opt.Opt.Data[Input*opt.TargetOffset():]
 				for j := 0; j < solution.Rows; j++ {
-					max, index := -math.MaxFloat64, 0
+					max, index := 0.0, 0
 					for k := 0; k < solution.Cols; k++ {
 						//value := float64(output.Data[j*10+k])
 						value := float64(solution.Data[j*solution.Cols+k])
+						if value < 0 {
+							value = -value
+						}
 						if value > max {
 							max, index = value, k
 						}
@@ -528,10 +531,13 @@ func Random() {
 			output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()*/
 			solution := samples[sample].Solution.Sample()
 			for j := 0; j < solution.Rows; j++ {
-				max, index := -math.MaxFloat64, 0
+				max, index := 0.0, 0
 				for k := 0; k < solution.Cols; k++ {
 					//value := float64(output.Data[j*10+k])
 					value := float64(solution.Data[j*solution.Cols+k])
+					if value < 0 {
+						value = -value
+					}
 					if value > max {
 						max, index = value, k
 					}
