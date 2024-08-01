@@ -31,8 +31,10 @@ const (
 )
 
 const (
+	// Symbols
+	Symbols = 11
 	// Input is the network input size
-	Input = 10 + 2*7 + 1
+	Input = Symbols + 2*7 + 1
 	// Width is the width of the markov model
 	Width = 3
 	// Height is the height of the markov model
@@ -111,7 +113,7 @@ type Opt struct {
 
 // TargetOffset is the target offset
 func (o Opt) TargetOffset() int {
-	return len(o.Input.Input.I) + len(o.Input.Output.I) + len(o.Output.Input.I)
+	return len(o.Input.Input.I) + len(o.Input.Output.I) + len(o.Output.Input.I) + 3
 }
 
 // TargetSize is the size of the target
@@ -120,7 +122,7 @@ func (o Opt) TargetSize() int {
 }
 
 // GetTrainingData gets the training data
-func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [10]int) {
+func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [Symbols]int) {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
 	for _, t := range set.Train {
@@ -200,18 +202,27 @@ func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [10]int) {
 			opt[i].Opt.Data[index+int(p.C)] = 1
 			index += Input
 		}
+		w[10]++
+		opt[i].Opt.Data[index+10] = 1
+		index += Input
 		for _, p := range pair.Output.I {
 			w[p.C]++
 			opt[i].Opt.Data[index+int(p.C)] = 1
-			opt[i].Opt.Data[index+10+2*7] = 1
+			opt[i].Opt.Data[index+Symbols+2*7] = 1
 			index += Input
 		}
+		w[10]++
+		opt[i].Opt.Data[index+10] = 1
+		index += Input
 
 		for _, p := range test[t].Input.I {
 			w[p.C]++
 			opt[i].Opt.Data[index+int(p.C)] = 1
 			index += Input
 		}
+		w[10]++
+		opt[i].Opt.Data[index+10] = 1
+		index += Input
 	}
 	return opt, w
 }
@@ -226,7 +237,7 @@ type OptSingle struct {
 
 // TargetOffset is the target offset
 func (o OptSingle) TargetOffset() int {
-	return o.Count*(len(o.Input.Input.I)+len(o.Input.Output.I)) + len(o.Output.Input.I)
+	return o.Count*(len(o.Input.Input.I)+len(o.Input.Output.I)+2) + len(o.Output.Input.I) + 1
 }
 
 // TargetSize is the size of the target
@@ -235,7 +246,7 @@ func (o OptSingle) TargetSize() int {
 }
 
 // GetSingleTrainingData gets the training data
-func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
+func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [Symbols]int) {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
 	for _, t := range set.Train {
@@ -316,18 +327,27 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [10]int) {
 			opt[0].Opt.Data[index+int(p.C)] = 1
 			index += Input
 		}
+		w[10]++
+		opt[0].Opt.Data[index+10] = 1
+		index += Input
 		for _, p := range pair.Output.I {
 			w[p.C]++
 			opt[0].Opt.Data[index+int(p.C)] = 1
-			opt[0].Opt.Data[index+10+2*7] = 1
+			opt[0].Opt.Data[index+Symbols+2*7] = 1
 			index += Input
 		}
+		w[10]++
+		opt[0].Opt.Data[index+10] = 1
+		index += Input
 	}
 	for _, p := range test[t].Input.I {
 		w[p.C]++
 		opt[0].Opt.Data[index+int(p.C)] = 1
 		index += Input
 	}
+	w[10]++
+	opt[0].Opt.Data[index+10] = 1
+	index += Input
 	return opt, w
 }
 
@@ -372,16 +392,16 @@ func Random() {
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
 		Value:    matrix.NewRandomMatrix(Input, Input),
-		Solution: matrix.NewRandomMatrix(10, opts[0].TargetSize()),
+		Solution: matrix.NewRandomMatrix(Symbols, opts[0].TargetSize()),
 		Order:    matrix.NewRandomMatrix(7, opts[0].TargetOffset()+opts[0].TargetSize()),
 	}
 	votes := make([][]int, opts[0].Output.Output.H*opts[0].Output.Output.W)
 	stats := make([][]Stat, opts[0].Output.Output.H*opts[0].Output.Output.W)
 	for v := range votes {
-		votes[v] = make([]int, 10)
-		stats[v] = make([]Stat, 10)
+		votes[v] = make([]int, Symbols)
+		stats[v] = make([]Stat, Symbols)
 	}
-	markov, state := make(map[State][10]int), State{}
+	markov, state := make(map[State][Symbols]int), State{}
 	var auto, acc plotter.Values
 	grids := make([][][]byte, 0, 8)
 	//for i := 0; i < 4*1024; i++ {
@@ -412,8 +432,8 @@ func Random() {
 				a, b := 0, 1
 				for j := 0; j < opt.Opt.Rows; j++ {
 					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-					copy(opt.Opt.Data[j*Input+10:j*Input+10+7], order.Data[x*7:(x+1)*7])
-					copy(opt.Opt.Data[j*Input+10+7:j*Input+10+2*7], order.Data[(y)*7:(y+1)*7])
+					copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+					copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 					a, b = b, a
 				}
 				solution := sample.Solution.Sample()
@@ -431,7 +451,7 @@ func Random() {
 						}
 					}
 					params[j*Input+index] = 1
-					params[j*Input+10+2*7] = 1
+					params[j*Input+Symbols+2*7] = 1
 				}
 				/*out := matrix.SelfAttention(
 				sample.Query.MulT(opt.Opt),
@@ -561,7 +581,7 @@ func Random() {
 							}
 							xx, yy := i+x, j+y
 							if xx < 0 || yy < 0 || xx >= w || yy >= h {
-								state[context] = byte(10 & 0xFF)
+								state[context] = byte(Symbols & 0xFF)
 								context++
 								continue
 							}
@@ -604,7 +624,7 @@ func Random() {
 	for j := range grid {
 		grid[j] = make([]byte, w)
 	}
-	counts := make([]int, 10)
+	counts := make([]int, Symbols)
 	for i := range votes {
 		max, index := 0, 0
 		for j, value := range votes[i] {
@@ -660,7 +680,7 @@ func Random() {
 	}
 	type Context struct {
 		State        State
-		Distribution [10]int
+		Distribution [Symbols]int
 	}
 	contexts := make([]Context, 0, len(markov))
 	fmt.Println()
@@ -696,8 +716,8 @@ func Random() {
 		for j := 0; j < h; j++ {
 			for i := 0; i < w; i++ {
 				max, index := float32(0), 0
-				for k := 0; k < 10; k++ {
-					value := weights.Data[(j*w+i)*10+k]
+				for k := 0; k < Symbols; k++ {
+					value := weights.Data[(j*w+i)*Symbols+k]
 					if value < 0 {
 						value = -value
 					}
@@ -720,7 +740,7 @@ func Random() {
 						}
 						xx, yy := i+x, j+y
 						if xx < 0 || yy < 0 || xx >= w || yy >= h {
-							state[context] = byte(10 & 0xFF)
+							state[context] = byte(Symbols & 0xFF)
 							context++
 							continue
 						}
@@ -756,7 +776,7 @@ func Random() {
 			fmt.Printf(".")
 		}
 		fmt.Printf("\n")
-	}, matrix.NewCoord(10, opts[0].TargetSize()))
+	}, matrix.NewCoord(Symbols, opts[0].TargetSize()))
 	var sample matrix.Sample
 	for i := 0; i < 33; i++ {
 		sample = optimizer.Iterate()
@@ -773,8 +793,8 @@ func Random() {
 	for j := 0; j < h; j++ {
 		for i := 0; i < w; i++ {
 			max, index := float32(0.0), 0
-			for k := 0; k < 10; k++ {
-				value := weights.Data[(j*w+i)*10+k]
+			for k := 0; k < Symbols; k++ {
+				value := weights.Data[(j*w+i)*Symbols+k]
 				if value < 0 {
 					value = -value
 				}
@@ -816,7 +836,7 @@ func Random() {
 						}
 						xx, yy := i+x, j+y
 						if xx < 0 || yy < 0 || xx >= w || yy >= h {
-							state[context] = byte(10 & 0xFF)
+							state[context] = byte(Symbols & 0xFF)
 							context++
 							continue
 						}
