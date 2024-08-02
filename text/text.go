@@ -7,7 +7,6 @@ package text
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -32,9 +31,9 @@ const (
 
 const (
 	// Symbols
-	Symbols = 11
+	Symbols = 10 + 3 + 3
 	// Input is the network input size
-	Input = Symbols + 2*7 + 1
+	Input = Symbols + 2*7
 	// Width is the width of the markov model
 	Width = 3
 	// Height is the height of the markov model
@@ -112,14 +111,12 @@ type OptSingle struct {
 	Output Pair
 }
 
-// TargetOffset is the target offset
-func (o OptSingle) TargetOffset() int {
-	return o.Count*(len(o.Input.Input.I)+len(o.Input.Output.I)+2) + len(o.Output.Input.I) + 1
-}
-
-// TargetSize is the size of the target
-func (o OptSingle) TargetSize() int {
-	return len(o.Output.Output.I)
+// Size is the size of the input
+func (o OptSingle) Size() int {
+	return o.Count*(len(o.Input.Input.I)+len(o.Input.Output.I)+
+		1+o.Input.Input.H+1+o.Input.Output.H) +
+		len(o.Output.Input.I) + o.Output.Input.H + 1 +
+		2
 }
 
 // GetSingleTrainingData gets the training data
@@ -195,35 +192,61 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [Symbols]in
 	for i := range opt {
 		opt[i].Input = train[i]
 		opt[i].Output = test[t]
-		opt[i].Opt = matrix.NewZeroMatrix(Input, opt[i].TargetOffset()+opt[i].TargetSize())
+		opt[i].Opt = matrix.NewZeroMatrix(Input, opt[i].Size())
 	}
 	index := 0
 	for _, pair := range train {
-		for _, p := range pair.Input.I {
-			w[p.C]++
-			opt[0].Opt.Data[index+int(p.C)] = 1
-			index += Input
-		}
 		w[10]++
 		opt[0].Opt.Data[index+10] = 1
 		index += Input
-		for _, p := range pair.Output.I {
+		for i, p := range pair.Input.I {
 			w[p.C]++
 			opt[0].Opt.Data[index+int(p.C)] = 1
-			opt[0].Opt.Data[index+Symbols+2*7] = 1
 			index += Input
+			if (i+1)%pair.Input.W == 0 && i+1 != len(pair.Input.I) {
+				w[11]++
+				opt[0].Opt.Data[index+11] = 1
+				index += Input
+			}
 		}
-		w[10]++
-		opt[0].Opt.Data[index+10] = 1
+		w[12]++
+		opt[0].Opt.Data[index+12] = 1
 		index += Input
-	}
-	for _, p := range test[t].Input.I {
-		w[p.C]++
-		opt[0].Opt.Data[index+int(p.C)] = 1
+		w[13]++
+		opt[0].Opt.Data[index+13] = 1
+		index += Input
+		for i, p := range pair.Output.I {
+			w[p.C]++
+			opt[0].Opt.Data[index+int(p.C)] = 1
+			index += Input
+			if (i+1)%pair.Output.W == 0 && i+1 != len(pair.Output.I) {
+				w[14]++
+				opt[0].Opt.Data[index+14] = 1
+				index += Input
+			}
+		}
+		w[15]++
+		opt[0].Opt.Data[index+15] = 1
 		index += Input
 	}
 	w[10]++
 	opt[0].Opt.Data[index+10] = 1
+	index += Input
+	for i, p := range test[t].Input.I {
+		w[p.C]++
+		opt[0].Opt.Data[index+int(p.C)] = 1
+		index += Input
+		if (i+1)%test[t].Input.W == 0 && i+1 != len(test[t].Input.I) {
+			w[11]++
+			opt[0].Opt.Data[index+11] = 1
+			index += Input
+		}
+	}
+	w[12]++
+	opt[0].Opt.Data[index+12] = 1
+	index += Input
+	w[13]++
+	opt[0].Opt.Data[index+13] = 1
 	index += Input
 	return opt, w
 }
@@ -263,13 +286,13 @@ func Text() {
 	rng := matrix.Rand(1)
 	sets := Load()
 	_ = sets
-	opts, ww := GetSingleTrainingData(sets, 0, 0)
+	opts, _ := GetSingleTrainingData(sets, 0, 0)
 	model := Model{
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
 		Value:    matrix.NewRandomMatrix(Input, Input),
-		Solution: matrix.NewRandomMatrix(Symbols, opts[0].TargetSize()),
-		Order:    matrix.NewRandomMatrix(7, opts[0].TargetOffset()+opts[0].TargetSize()),
+		Solution: matrix.NewRandomMatrix(10, 1),
+		Order:    matrix.NewRandomMatrix(7, opts[0].Size()),
 	}
 	votes := make([][]int, opts[0].Output.Output.H*opts[0].Output.Output.W)
 	stats := make([][]Stat, opts[0].Output.Output.H*opts[0].Output.Output.W)
@@ -277,9 +300,9 @@ func Text() {
 		votes[v] = make([]int, Symbols)
 		stats[v] = make([]Stat, Symbols)
 	}
-	markov, state := make(map[State][Symbols]int), State{}
+	//markov, state := make(map[State][Symbols]int), State{}
 	var auto, acc plotter.Values
-	grids := make([][][]byte, 0, 8)
+	//grids := make([][][]byte, 0, 8)
 	samples := make([]Sample, 8*1024)
 	maxReduction, cut := 0.0, 0
 	{
@@ -305,7 +328,7 @@ func Text() {
 					a, b = b, a
 				}
 				solution := sample.Solution.Sample()
-				params := opt.Opt.Data[Input*opt.TargetOffset():]
+				params := opt.Opt.Data[Input*(opt.Size()-1):]
 				for j := 0; j < solution.Rows; j++ {
 					max, index := 0.0, 0
 					for k := 0; k < solution.Cols; k++ {
@@ -319,7 +342,6 @@ func Text() {
 						}
 					}
 					params[j*Input+index] = 1
-					params[j*Input+Symbols+2*7] = 1
 				}
 				/*out := matrix.SelfAttention(
 				sample.Query.MulT(opt.Opt),
@@ -405,12 +427,13 @@ func Text() {
 			}
 		}
 		samples = samples[:cut]
+		fmt.Println(cut)
 		for sample := range samples {
-			h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
+			/*h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
 			grid := make([][]byte, h)
 			for j := range grid {
 				grid[j] = make([]byte, w)
-			}
+			}*/
 			solution := samples[sample].Solution.Sample()
 			for j := 0; j < solution.Rows; j++ {
 				max, index := 0.0, 0
@@ -428,9 +451,9 @@ func Text() {
 				stats[j][index].Sum += max
 				stats[j][index].SumSquared += max * max
 				votes[j][index]++
-				grid[j/h][j%w] = byte(index)
+				//grid[j/h][j%w] = byte(index)
 			}
-			grids = append(grids, grid)
+			/*grids = append(grids, grid)
 			correct, count := 0.0, 0.0
 			for j := 0; j < h; j++ {
 				for i := 0; i < w; i++ {
@@ -467,11 +490,12 @@ func Text() {
 			}
 			fmt.Println(correct / count)
 			auto = append(auto, samples[0].Cost)
-			acc = append(acc, correct/count)
+			acc = append(acc, correct/count)*/
 		}
 	}
+	fmt.Println(votes[0])
 
-	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
+	/*h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
 	grid := make([][]byte, h)
 	for j := range grid {
 		grid[j] = make([]byte, w)
@@ -722,7 +746,7 @@ func Text() {
 	fmt.Println(correct / count)
 	fmt.Println(correct3 / count3)
 	fmt.Println(correct2 / count2)
-	fmt.Println(maxReduction, cut)
+	fmt.Println(maxReduction, cut)*/
 
 	p := plot.New()
 	p.Title.Text = "acc histogram plot"
@@ -752,7 +776,7 @@ func Text() {
 		panic(err)
 	}
 
-	x, y, xy, xx, yy := 0.0, 0.0, 0.0, 0.0, 0.0
+	/*x, y, xy, xx, yy := 0.0, 0.0, 0.0, 0.0, 0.0
 	for i, X := range acc {
 		Y := auto[i]
 		x += X
@@ -768,5 +792,5 @@ func Text() {
 	xx /= length
 	yy /= length
 	corr := (xy - x*y) / (math.Sqrt(xx-x*x) * math.Sqrt(yy-y*y))
-	fmt.Println("corr", corr)
+	fmt.Println("corr", corr)*/
 }
