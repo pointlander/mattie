@@ -104,129 +104,6 @@ type Pair struct {
 	Output Image
 }
 
-// Opt is an optimization
-type Opt struct {
-	Opt    matrix.Matrix
-	Input  Pair
-	Output Pair
-}
-
-// TargetOffset is the target offset
-func (o Opt) TargetOffset() int {
-	return len(o.Input.Input.I) + len(o.Input.Output.I) + len(o.Output.Input.I) + 3
-}
-
-// TargetSize is the size of the target
-func (o Opt) TargetSize() int {
-	return len(o.Output.Output.I)
-}
-
-// GetTrainingData gets the training data
-func GetTrainingData(sets []Set, s, t int) (opt []Opt, w [Symbols]int) {
-	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
-	set := sets[s]
-	for _, t := range set.Train {
-		pair := Pair{
-			Class: s,
-			Input: Image{
-				W: len(t.Input[0]),
-				H: len(t.Input),
-			},
-			Output: Image{
-				W: len(t.Output[0]),
-				H: len(t.Output),
-			},
-		}
-		for j, v := range t.Input {
-			for i := range v {
-				pair.Input.I = append(pair.Input.I, Pixel{
-					C: v[i],
-					X: i,
-					Y: j,
-				})
-			}
-		}
-		for j, v := range t.Output {
-			for i := range v {
-				pair.Output.I = append(pair.Output.I, Pixel{
-					C: v[i],
-					X: i,
-					Y: j,
-				})
-			}
-		}
-		train = append(train, pair)
-	}
-	for _, t := range set.Test {
-		pair := Pair{
-			Class: s,
-			Input: Image{
-				W: len(t.Input[0]),
-				H: len(t.Input),
-			},
-			Output: Image{
-				W: len(t.Output[0]),
-				H: len(t.Output),
-			},
-		}
-		for j, v := range t.Input {
-			for i := range v {
-				pair.Input.I = append(pair.Input.I, Pixel{
-					C: v[i],
-					X: i,
-					Y: j,
-				})
-			}
-		}
-		for j, v := range t.Output {
-			for i := range v {
-				pair.Output.I = append(pair.Output.I, Pixel{
-					C: v[i],
-					X: i,
-					Y: j,
-				})
-			}
-		}
-		test = append(test, pair)
-	}
-	opt = make([]Opt, len(train))
-	for i := range opt {
-		opt[i].Input = train[i]
-		opt[i].Output = test[t]
-		opt[i].Opt = matrix.NewZeroMatrix(Input, opt[i].TargetOffset()+opt[i].TargetSize())
-	}
-	for i, pair := range train {
-		index := 0
-		for _, p := range pair.Input.I {
-			w[p.C]++
-			opt[i].Opt.Data[index+int(p.C)] = 1
-			index += Input
-		}
-		w[10]++
-		opt[i].Opt.Data[index+10] = 1
-		index += Input
-		for _, p := range pair.Output.I {
-			w[p.C]++
-			opt[i].Opt.Data[index+int(p.C)] = 1
-			opt[i].Opt.Data[index+Symbols+2*7] = 1
-			index += Input
-		}
-		w[10]++
-		opt[i].Opt.Data[index+10] = 1
-		index += Input
-
-		for _, p := range test[t].Input.I {
-			w[p.C]++
-			opt[i].Opt.Data[index+int(p.C)] = 1
-			index += Input
-		}
-		w[10]++
-		opt[i].Opt.Data[index+10] = 1
-		index += Input
-	}
-	return opt, w
-}
-
 // OptSingle is an optimization
 type OptSingle struct {
 	Count  int
@@ -386,7 +263,6 @@ func Text() {
 	rng := matrix.Rand(1)
 	sets := Load()
 	_ = sets
-	//opts, ww := GetTrainingData(sets, 0, 0)
 	opts, ww := GetSingleTrainingData(sets, 0, 0)
 	model := Model{
 		Query:    matrix.NewRandomMatrix(Input, Input),
@@ -404,8 +280,6 @@ func Text() {
 	markov, state := make(map[State][Symbols]int), State{}
 	var auto, acc plotter.Values
 	grids := make([][][]byte, 0, 8)
-	//for i := 0; i < 4*1024; i++ {
-	//fmt.Println(i)
 	samples := make([]Sample, 8*1024)
 	maxReduction, cut := 0.0, 0
 	{
@@ -419,15 +293,9 @@ func Text() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			//opts, _ := GetTrainingData(sets, 0, 0)
 			opts, _ := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
 			for _, opt := range opts {
-				/*input := matrix.NewZeroMatrix(inputSize, 1)
-				for i, value := range opt.Output.Input.I {
-					input.Data[i*10+int(value.C)] = 1
-				}
-				output := sample.W2.MulT(sample.W1.MulT(input).Add(sample.B1).Sigmoid()).Add(sample.B2).Sigmoid()*/
 				order := sample.Order.Sample()
 				a, b := 0, 1
 				for j := 0; j < opt.Opt.Rows; j++ {
@@ -538,17 +406,11 @@ func Text() {
 		}
 		samples = samples[:cut]
 		for sample := range samples {
-			//fmt.Println(samples[0].Cost)
 			h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
 			grid := make([][]byte, h)
 			for j := range grid {
 				grid[j] = make([]byte, w)
 			}
-			/*input := matrix.NewZeroMatrix(inputSize, 1)
-			for i, value := range opts[0].Output.Input.I {
-				input.Data[i*10+int(value.C)] = 1
-			}
-			output := samples[0].W2.MulT(samples[0].W1.MulT(input).Add(samples[0].B1).Sigmoid()).Add(samples[0].B2).Sigmoid()*/
 			solution := samples[sample].Solution.Sample()
 			for j := 0; j < solution.Rows; j++ {
 				max, index := 0.0, 0
@@ -607,16 +469,6 @@ func Text() {
 			auto = append(auto, samples[0].Cost)
 			acc = append(acc, correct/count)
 		}
-
-		//for i := 0; i < model.Solution.Rows; i++ {
-		//	for j := 0; j < model.Solution.Cols; j++ {
-		//avg := stats[i][j].Sum / stats[i][j].Count
-		//model.Solution.Data[i*model.Solution.Cols+j].Mean = avg
-		//model.Solution.Data[i*model.Solution.Cols+j].StdDev =
-		//	math.Sqrt(stats[i][j].SumSquared/stats[i][j].Count - avg*avg)
-		//		model.Solution.Data[i*model.Solution.Cols+j].StdDev = float64(votes[i][j])
-		//	}
-		//}
 	}
 
 	h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
