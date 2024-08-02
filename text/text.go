@@ -266,6 +266,7 @@ type Sample struct {
 	Key      matrix.Generator
 	Value    matrix.Generator
 	Solution matrix.Generator
+	S        int
 	Order    matrix.Generator
 	Cost     float64
 	Grid     [][]int
@@ -303,7 +304,7 @@ func Text() {
 	//markov, state := make(map[State][Symbols]int), State{}
 	var auto, acc plotter.Values
 	//grids := make([][][]byte, 0, 8)
-	samples := make([]Sample, 8*1024)
+	samples := make([]Sample, 1000)
 	maxReduction, cut := 0.0, 0
 	{
 		for i := range samples {
@@ -312,6 +313,7 @@ func Text() {
 			samples[i].Value = model.Value.Sample(&rng)
 			samples[i].Solution = model.Solution.Sample(&rng)
 			samples[i].Order = model.Order.Sample(&rng)
+			samples[i].S = i % 10
 		}
 
 		done := make(chan bool, 8)
@@ -327,12 +329,12 @@ func Text() {
 					copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 					a, b = b, a
 				}
-				solution := sample.Solution.Sample()
+				//solution := sample.Solution.Sample()
 				params := opt.Opt.Data[Input*(opt.Size()-1):]
-				for j := 0; j < solution.Rows; j++ {
+				params[sample.S] = 1
+				/*for j := 0; j < solution.Rows; j++ {
 					max, index := 0.0, 0
 					for k := 0; k < solution.Cols; k++ {
-						//value := float64(output.Data[j*10+k])
 						value := float64(solution.Data[j*solution.Cols+k])
 						if value < 0 {
 							value = -value
@@ -342,7 +344,7 @@ func Text() {
 						}
 					}
 					params[j*Input+index] = 1
-				}
+				}*/
 				/*out := matrix.SelfAttention(
 				sample.Query.MulT(opt.Opt),
 				sample.Key.MulT(opt.Opt),
@@ -436,9 +438,8 @@ func Text() {
 			}*/
 			solution := samples[sample].Solution.Sample()
 			for j := 0; j < solution.Rows; j++ {
-				max, index := 0.0, 0
+				/*max, index := 0.0, 0
 				for k := 0; k < solution.Cols; k++ {
-					//value := float64(output.Data[j*10+k])
 					value := float64(solution.Data[j*solution.Cols+k])
 					if value < 0 {
 						value = -value
@@ -446,10 +447,11 @@ func Text() {
 					if value > max {
 						max, index = value, k
 					}
-				}
+				}*/
+				index := samples[sample].S
 				stats[j][index].Count++
-				stats[j][index].Sum += max
-				stats[j][index].SumSquared += max * max
+				//stats[j][index].Sum += max
+				//stats[j][index].SumSquared += max * max
 				votes[j][index]++
 				//grid[j/h][j%w] = byte(index)
 			}
