@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package random
+package text
 
 import (
 	"encoding/json"
@@ -381,8 +381,8 @@ type Stat struct {
 // State is a markov state
 type State [Size]byte
 
-// Random mode
-func Random() {
+// Text mode
+func Text() {
 	rng := matrix.Rand(1)
 	sets := Load()
 	_ = sets
