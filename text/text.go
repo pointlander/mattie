@@ -305,7 +305,6 @@ func Text() {
 	var auto, acc plotter.Values
 	//grids := make([][][]byte, 0, 8)
 	samples := make([]Sample, 1000)
-	maxReduction, cut := 0.0, 0
 	{
 		for i := range samples {
 			samples[i].Query = model.Query.Sample(&rng)
@@ -402,7 +401,12 @@ func Text() {
 			vr += diff * diff
 		}
 		vr /= float64(len(samples))
-		for i := 1; i < len(samples)-1; i++ {
+		type Cut struct {
+			Reduction float64
+			Index     int
+		}
+		cuts := make(chan Cut, 8)
+		mvr := func(i int) {
 			avga, avgb := 0.0, 0.0
 			vara, varb := 0.0, 0.0
 			for j := 0; j < i; j++ {
@@ -424,10 +428,36 @@ func Text() {
 			}
 			varb /= float64(len(samples) - i)
 			reduction := vr - (vara + varb)
-			if reduction > maxReduction {
-				maxReduction, cut = reduction, i
+			cuts <- Cut{
+				Reduction: reduction,
+				Index:     i,
 			}
 		}
+		maxReduction, cut := 0.0, 0
+		flight, index, cpus = 0, 1, runtime.NumCPU()
+		for flight < cpus && index < len(samples)-1 {
+			go mvr(index)
+			index++
+			flight++
+		}
+		for index < len(samples)-1 {
+			result := <-cuts
+			if result.Reduction > maxReduction {
+				maxReduction, cut = result.Reduction, result.Index
+			}
+			flight--
+
+			go mvr(index)
+			index++
+			flight++
+		}
+		for i := 0; i < flight; i++ {
+			result := <-cuts
+			if result.Reduction > maxReduction {
+				maxReduction, cut = result.Reduction, result.Index
+			}
+		}
+
 		samples = samples[:cut]
 		fmt.Println(cut)
 		for sample := range samples {
