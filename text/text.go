@@ -12,9 +12,6 @@ import (
 	"sort"
 
 	"github.com/pointlander/matrix"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
 )
 
 const (
@@ -103,24 +100,25 @@ type Pair struct {
 	Output Image
 }
 
-// OptSingle is an optimization
-type OptSingle struct {
+// Problem is an optimization problem
+type Problem struct {
 	Count  int
 	Opt    matrix.Matrix
-	Input  Pair
+	Input  []Pair
 	Output Pair
 }
 
 // Size is the size of the input
-func (o OptSingle) Size() int {
-	return o.Count*(len(o.Input.Input.I)+len(o.Input.Output.I)+
-		1+o.Input.Input.H+1+o.Input.Output.H) +
-		len(o.Output.Input.I) + o.Output.Input.H + 1 +
-		2
+func (p Problem) Size() int {
+	sum := 0
+	for _, input := range p.Input {
+		sum += len(input.Input.I) + len(input.Output.I) + 1 + input.Input.H + 1 + input.Output.H
+	}
+	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 2
 }
 
 // GetSingleTrainingData gets the training data
-func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [Symbols]int) {
+func GetSingleTrainingData(sets []Set, s, t int) Problem {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
 	for _, t := range set.Train {
@@ -187,68 +185,54 @@ func GetSingleTrainingData(sets []Set, s, t int) (opt []OptSingle, w [Symbols]in
 		}
 		test = append(test, pair)
 	}
-	opt = make([]OptSingle, 1)
-	opt[0].Count = len(train)
-	for i := range opt {
-		opt[i].Input = train[i]
-		opt[i].Output = test[t]
-		opt[i].Opt = matrix.NewZeroMatrix(Input, opt[i].Size())
+	problem := Problem{
+		Count: len(train),
 	}
+	problem.Input = train
+	problem.Output = test[t]
+	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	index := 0
 	for _, pair := range train {
-		w[10]++
-		opt[0].Opt.Data[index+10] = 1
+		problem.Opt.Data[index+10] = 1
 		index += Input
 		for i, p := range pair.Input.I {
-			w[p.C]++
-			opt[0].Opt.Data[index+int(p.C)] = 1
+			problem.Opt.Data[index+int(p.C)] = 1
 			index += Input
 			if (i+1)%pair.Input.W == 0 && i+1 != len(pair.Input.I) {
-				w[11]++
-				opt[0].Opt.Data[index+11] = 1
+				problem.Opt.Data[index+11] = 1
 				index += Input
 			}
 		}
-		w[12]++
-		opt[0].Opt.Data[index+12] = 1
+		problem.Opt.Data[index+12] = 1
 		index += Input
-		w[13]++
-		opt[0].Opt.Data[index+13] = 1
+		problem.Opt.Data[index+13] = 1
 		index += Input
 		for i, p := range pair.Output.I {
-			w[p.C]++
-			opt[0].Opt.Data[index+int(p.C)] = 1
+			problem.Opt.Data[index+int(p.C)] = 1
 			index += Input
 			if (i+1)%pair.Output.W == 0 && i+1 != len(pair.Output.I) {
-				w[14]++
-				opt[0].Opt.Data[index+14] = 1
+				problem.Opt.Data[index+14] = 1
 				index += Input
 			}
 		}
-		w[15]++
-		opt[0].Opt.Data[index+15] = 1
+		problem.Opt.Data[index+15] = 1
 		index += Input
 	}
-	w[10]++
-	opt[0].Opt.Data[index+10] = 1
+	problem.Opt.Data[index+10] = 1
 	index += Input
 	for i, p := range test[t].Input.I {
-		w[p.C]++
-		opt[0].Opt.Data[index+int(p.C)] = 1
+		problem.Opt.Data[index+int(p.C)] = 1
 		index += Input
 		if (i+1)%test[t].Input.W == 0 && i+1 != len(test[t].Input.I) {
-			w[11]++
-			opt[0].Opt.Data[index+11] = 1
+			problem.Opt.Data[index+11] = 1
 			index += Input
 		}
 	}
-	w[12]++
-	opt[0].Opt.Data[index+12] = 1
+	problem.Opt.Data[index+12] = 1
 	index += Input
-	w[13]++
-	opt[0].Opt.Data[index+13] = 1
+	problem.Opt.Data[index+13] = 1
 	index += Input
-	return opt, w
+	return problem
 }
 
 // Model model is the random matrix model
@@ -286,24 +270,15 @@ type State [Size]byte
 func Text() {
 	rng := matrix.Rand(1)
 	sets := Load()
-	_ = sets
-	opts, _ := GetSingleTrainingData(sets, 0, 0)
+	opt := GetSingleTrainingData(sets, 0, 0)
 	model := Model{
 		Query:    matrix.NewRandomMatrix(Input, Input),
 		Key:      matrix.NewRandomMatrix(Input, Input),
 		Value:    matrix.NewRandomMatrix(Input, Input),
 		Solution: matrix.NewRandomMatrix(10, 1),
-		Order:    matrix.NewRandomMatrix(7, opts[0].Size()),
+		Order:    matrix.NewRandomMatrix(7, opt.Size()),
 	}
-	votes := make([][]int, opts[0].Output.Output.H*opts[0].Output.Output.W)
-	stats := make([][]Stat, opts[0].Output.Output.H*opts[0].Output.Output.W)
-	for v := range votes {
-		votes[v] = make([]int, Symbols)
-		stats[v] = make([]Stat, Symbols)
-	}
-	//markov, state := make(map[State][Symbols]int), State{}
-	var auto, acc plotter.Values
-	//grids := make([][][]byte, 0, 8)
+	stats := make([]int, Symbols)
 	samples := make([]Sample, 1000)
 	{
 		for i := range samples {
@@ -317,54 +292,38 @@ func Text() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opts, _ := GetSingleTrainingData(sets, 0, 0)
+			opt := GetSingleTrainingData(sets, 0, 0)
 			sum := 0.0
-			for _, opt := range opts {
-				order := sample.Order.Sample()
-				a, b := 0, 1
-				for j := 0; j < opt.Opt.Rows; j++ {
-					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-					copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-					copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
-					a, b = b, a
-				}
-				//solution := sample.Solution.Sample()
-				params := opt.Opt.Data[Input*(opt.Size()-1):]
-				params[sample.S] = 1
-				/*for j := 0; j < solution.Rows; j++ {
-					max, index := 0.0, 0
-					for k := 0; k < solution.Cols; k++ {
-						value := float64(solution.Data[j*solution.Cols+k])
-						if value < 0 {
-							value = -value
-						}
-						if value > max {
-							max, index = value, k
-						}
-					}
-					params[j*Input+index] = 1
-				}*/
-				/*out := matrix.SelfAttention(
-				sample.Query.MulT(opt.Opt),
-				sample.Key.MulT(opt.Opt),
-				sample.Value.MulT(opt.Opt))*/
-				query := sample.Query.Sample()
-				key := sample.Key.Sample()
-				value := sample.Value.Sample()
-				entropy := matrix.SelfEntropy(
-					query.MulT(opt.Opt),
-					key.MulT(opt.Opt),
-					value.MulT(opt.Opt))
-				for _, value := range entropy {
-					sum += float64(value)
-				}
-				/*for j := 0; j < out.Rows; j++ {
-					for k := 0; k < out.Cols; k++ {
-						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
-						sum += float64(diff*diff)
-					}
-				}*/
+			order := sample.Order.Sample()
+			a, b := 0, 1
+			for j := 0; j < opt.Opt.Rows; j++ {
+				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
+				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+				a, b = b, a
 			}
+			params := opt.Opt.Data[Input*(opt.Size()-1):]
+			params[sample.S] = 1
+			/*out := matrix.SelfAttention(
+			sample.Query.MulT(opt.Opt),
+			sample.Key.MulT(opt.Opt),
+			sample.Value.MulT(opt.Opt))*/
+			query := sample.Query.Sample()
+			key := sample.Key.Sample()
+			value := sample.Value.Sample()
+			entropy := matrix.SelfEntropy(
+				query.MulT(opt.Opt),
+				key.MulT(opt.Opt),
+				value.MulT(opt.Opt))
+			for _, value := range entropy {
+				sum += float64(value)
+			}
+			/*for j := 0; j < out.Rows; j++ {
+				for k := 0; k < out.Cols; k++ {
+					diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
+					sum += float64(diff*diff)
+				}
+			}*/
 			sample.Cost = sum
 			done <- true
 		}
@@ -461,368 +420,12 @@ func Text() {
 		samples = samples[:cut]
 		fmt.Println(cut)
 		for sample := range samples {
-			/*h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
-			grid := make([][]byte, h)
-			for j := range grid {
-				grid[j] = make([]byte, w)
-			}*/
 			solution := samples[sample].Solution.Sample()
 			for j := 0; j < solution.Rows; j++ {
-				/*max, index := 0.0, 0
-				for k := 0; k < solution.Cols; k++ {
-					value := float64(solution.Data[j*solution.Cols+k])
-					if value < 0 {
-						value = -value
-					}
-					if value > max {
-						max, index = value, k
-					}
-				}*/
 				index := samples[sample].S
-				stats[j][index].Count++
-				//stats[j][index].Sum += max
-				//stats[j][index].SumSquared += max * max
-				votes[j][index]++
-				//grid[j/h][j%w] = byte(index)
-			}
-			/*grids = append(grids, grid)
-			correct, count := 0.0, 0.0
-			for j := 0; j < h; j++ {
-				for i := 0; i < w; i++ {
-					context := 0
-					state = State{}
-					for x := -Width / 2; x < Width/2; x++ {
-						for y := -Height / 2; y < Height/2; y++ {
-							if x == 0 && y == 0 {
-								continue
-							}
-							xx, yy := i+x, j+y
-							if xx < 0 || yy < 0 || xx >= w || yy >= h {
-								state[context] = byte(Symbols & 0xFF)
-								context++
-								continue
-							}
-							state[context] = byte(grid[yy][xx] & 0xFF)
-							context++
-						}
-					}
-					s := markov[state]
-					s[grid[j][i]]++
-					markov[state] = s
-					count++
-					value := opts[0].Output.Output.I[j*w+i].C
-					if value == grid[j][i] {
-						fmt.Printf("* ")
-						correct++
-						continue
-					}
-					fmt.Printf("%d ", grid[j][i])
-				}
-				fmt.Println()
-			}
-			fmt.Println(correct / count)
-			auto = append(auto, samples[0].Cost)
-			acc = append(acc, correct/count)*/
-		}
-	}
-	fmt.Println(votes[0])
-
-	/*h, w := opts[0].Output.Output.H, opts[0].Output.Output.W
-	grid := make([][]byte, h)
-	for j := range grid {
-		grid[j] = make([]byte, w)
-	}
-	counts := make([]int, Symbols)
-	for i := range votes {
-		max, index := 0, 0
-		for j, value := range votes[i] {
-			counts[j] += value
-			if value > max {
-				max, index = value, j
+				stats[index]++
 			}
 		}
-		grid[i/h][i%w] = byte(index)
-		fmt.Printf("%d ", index)
-		if (i+1)%w == 0 {
-			fmt.Println()
-		}
 	}
-	for i, count := range counts {
-		if ww[i] == 0 {
-			fmt.Printf("0 ")
-			continue
-		}
-		fmt.Printf("%d ", count/ww[i])
-	}
-	fmt.Println()
-	fmt.Println()
-	correct, count := 0.0, 0.0
-	for j := 0; j < h; j++ {
-		for i := 0; i < w; i++ {
-			count++
-			value := opts[0].Output.Output.I[j*w+i].C
-			if value == grid[j][i] {
-				fmt.Printf("* ")
-				correct++
-				continue
-			}
-			fmt.Printf("%d ", grid[j][i])
-		}
-		fmt.Println()
-	}
-	fmt.Println()
-	for j := 0; j < h; j++ {
-		for i := 0; i < w; i++ {
-			value := int(opts[0].Output.Output.I[j*w+i].C)
-			fmt.Printf("%d ", value)
-		}
-		fmt.Println()
-	}
-	for i := 0; i < model.Solution.Rows; i++ {
-		for j := 0; j < model.Solution.Cols; j++ {
-			avg := stats[i][j].Sum / stats[i][j].Count
-			stddev := math.Sqrt(stats[i][j].SumSquared/stats[i][j].Count - avg*avg)
-			fmt.Printf("%f ", avg/stddev)
-		}
-		fmt.Println()
-	}
-	type Context struct {
-		State        State
-		Distribution [Symbols]int
-	}
-	contexts := make([]Context, 0, len(markov))
-	fmt.Println()
-	for key, value := range markov {
-		contexts = append(contexts, Context{
-			State:        key,
-			Distribution: value,
-		})
-	}
-	sort.Slice(contexts, func(i, j int) bool {
-		for k := range contexts[i].State {
-			if contexts[i].State[k] < contexts[j].State[k] {
-				return true
-			} else if contexts[i].State[k] > contexts[j].State[k] {
-				return false
-			}
-		}
-		return false
-	})
-	for _, value := range contexts {
-		fmt.Println(value.State, value.Distribution)
-	}
-	done := make(chan bool, 8)
-	process := func(sample *matrix.Sample) {
-		x1 := sample.Vars[0][0].Sample()
-		y1 := sample.Vars[0][1].Sample()
-		z1 := sample.Vars[0][2].Sample()
-		weights := x1.Add(y1.H(z1))
-		grid := make([][]int, h)
-		for j := range grid {
-			grid[j] = make([]int, w)
-		}
-		for j := 0; j < h; j++ {
-			for i := 0; i < w; i++ {
-				max, index := float32(0), 0
-				for k := 0; k < Symbols; k++ {
-					value := weights.Data[(j*w+i)*Symbols+k]
-					if value < 0 {
-						value = -value
-					}
-					if value > max {
-						max, index = value, k
-					}
-				}
-				grid[j][i] = index
-			}
-		}
-		sum := 0.0
-		for j := 0; j < h; j++ {
-			for i := 0; i < w; i++ {
-				context := 0
-				state = State{}
-				for x := -Width / 2; x < Width/2; x++ {
-					for y := -Height / 2; y < Height/2; y++ {
-						if x == 0 && y == 0 {
-							continue
-						}
-						xx, yy := i+x, j+y
-						if xx < 0 || yy < 0 || xx >= w || yy >= h {
-							state[context] = byte(Symbols & 0xFF)
-							context++
-							continue
-						}
-						state[context] = byte(grid[yy][xx] & 0xFF)
-						context++
-					}
-				}
-				s := markov[state]
-				sum += float64(s[grid[j][i]])
-			}
-		}
-		sample.Cost = -sum
-		done <- true
-	}
-	optimizer := matrix.NewOptimizer(&rng, 9, .1, 1, func(samples []matrix.Sample, x ...matrix.Matrix) {
-		index, flight, cpus := 0, 0, runtime.NumCPU()
-		for flight < cpus && index < len(samples) {
-			go process(&samples[index])
-			index++
-			flight++
-		}
-		for index < len(samples) {
-			<-done
-			flight--
-			fmt.Printf(".")
-
-			go process(&samples[index])
-			index++
-			flight++
-		}
-		for i := 0; i < flight; i++ {
-			<-done
-			fmt.Printf(".")
-		}
-		fmt.Printf("\n")
-	}, matrix.NewCoord(Symbols, opts[0].TargetSize()))
-	var sample matrix.Sample
-	for i := 0; i < 33; i++ {
-		sample = optimizer.Iterate()
-		fmt.Println(i, sample.Cost)
-	}
-	x1 := sample.Vars[0][0].Sample()
-	y1 := sample.Vars[0][1].Sample()
-	z1 := sample.Vars[0][2].Sample()
-	weights := x1.Add(y1.H(z1))
-	grid = make([][]byte, h)
-	for j := range grid {
-		grid[j] = make([]byte, w)
-	}
-	for j := 0; j < h; j++ {
-		for i := 0; i < w; i++ {
-			max, index := float32(0.0), 0
-			for k := 0; k < Symbols; k++ {
-				value := weights.Data[(j*w+i)*Symbols+k]
-				if value < 0 {
-					value = -value
-				}
-				if value > max {
-					max, index = value, k
-				}
-			}
-			grid[j][i] = byte(index)
-		}
-	}
-	correct3, count3 := 0.0, 0.0
-	for j := 0; j < h; j++ {
-		for i := 0; i < w; i++ {
-			count3++
-			value := opts[0].Output.Output.I[j*w+i].C
-			if value == grid[j][i] {
-				correct3++
-				fmt.Printf(Blue+"%d "+Reset, grid[j][i])
-				continue
-			}
-			fmt.Printf("%d ", grid[j][i])
-		}
-		fmt.Println()
-	}
-	fmt.Println()
-
-	var grid2 [][]byte
-	max := 0.0
-	for _, grid := range grids {
-		sum := 0.0
-		for j := 0; j < h; j++ {
-			for i := 0; i < w; i++ {
-				context := 0
-				state = State{}
-				for x := -Width / 2; x < Width/2; x++ {
-					for y := -Height / 2; y < Height/2; y++ {
-						if x == 0 && y == 0 {
-							continue
-						}
-						xx, yy := i+x, j+y
-						if xx < 0 || yy < 0 || xx >= w || yy >= h {
-							state[context] = byte(Symbols & 0xFF)
-							context++
-							continue
-						}
-						state[context] = byte(grid[yy][xx] & 0xFF)
-						context++
-					}
-				}
-				s := markov[state]
-				sum += float64(s[grid[j][i]])
-			}
-		}
-		if sum > max {
-			max, grid2 = sum, grid
-		}
-	}
-	correct2, count2 := 0.0, 0.0
-	for j := 0; j < h; j++ {
-		for i := 0; i < w; i++ {
-			count2++
-			value := opts[0].Output.Output.I[j*w+i].C
-			if value == grid2[j][i] {
-				correct2++
-				fmt.Printf(Blue+"%d "+Reset, grid2[j][i])
-				continue
-			}
-			fmt.Printf("%d ", grid2[j][i])
-		}
-		fmt.Println()
-	}
-	fmt.Println()
-	fmt.Println(correct / count)
-	fmt.Println(correct3 / count3)
-	fmt.Println(correct2 / count2)
-	fmt.Println(maxReduction, cut)*/
-
-	p := plot.New()
-	p.Title.Text = "acc histogram plot"
-
-	hist, err := plotter.NewHist(acc, 10)
-	if err != nil {
-		panic(err)
-	}
-	p.Add(hist)
-
-	err = p.Save(8*vg.Inch, 8*vg.Inch, "acc_histogram.png")
-	if err != nil {
-		panic(err)
-	}
-
-	p = plot.New()
-	p.Title.Text = "auto histogram plot"
-
-	hist, err = plotter.NewHist(auto, 10)
-	if err != nil {
-		panic(err)
-	}
-	p.Add(hist)
-
-	err = p.Save(8*vg.Inch, 8*vg.Inch, "auto_histogram.png")
-	if err != nil {
-		panic(err)
-	}
-
-	/*x, y, xy, xx, yy := 0.0, 0.0, 0.0, 0.0, 0.0
-	for i, X := range acc {
-		Y := auto[i]
-		x += X
-		y += Y
-		xy += X * Y
-		xx += X * X
-		yy += Y * Y
-	}
-	length := float64(len(acc))
-	x /= length
-	y /= length
-	xy /= length
-	xx /= length
-	yy /= length
-	corr := (xy - x*y) / (math.Sqrt(xx-x*x) * math.Sqrt(yy-y*y))
-	fmt.Println("corr", corr)*/
+	fmt.Println(stats)
 }
