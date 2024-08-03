@@ -250,14 +250,13 @@ type Model struct {
 
 // Sample is a sample
 type Sample struct {
-	Query    matrix.Generator
-	Key      matrix.Generator
-	Value    matrix.Generator
-	Solution matrix.Generator
-	S        int
-	Order    matrix.Generator
-	Cost     float64
-	Grid     [][]int
+	Query matrix.Generator
+	Key   matrix.Generator
+	Value matrix.Generator
+	S     int
+	Order matrix.Generator
+	Cost  float64
+	Grid  [][]int
 }
 
 // Stat is a statistic
@@ -280,21 +279,19 @@ func Text() {
 		depth--
 		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 		model := Model{
-			Query:    matrix.NewRandomMatrix(Input, Input),
-			Key:      matrix.NewRandomMatrix(Input, Input),
-			Value:    matrix.NewRandomMatrix(Input, Input),
-			Solution: matrix.NewRandomMatrix(10, 1),
-			Order:    matrix.NewRandomMatrix(7, opt.Size()),
+			Query: matrix.NewRandomMatrix(Input, Input),
+			Key:   matrix.NewRandomMatrix(Input, Input),
+			Value: matrix.NewRandomMatrix(Input, Input),
+			Order: matrix.NewRandomMatrix(7, opt.Size()),
 		}
 		stats := make([]int, Symbols)
-		samples := make([]Sample, 1000)
+		samples := make([]Sample, 100*Symbols)
 		for i := range samples {
 			samples[i].Query = model.Query.Sample(&rng)
 			samples[i].Key = model.Key.Sample(&rng)
 			samples[i].Value = model.Value.Sample(&rng)
-			samples[i].Solution = model.Solution.Sample(&rng)
 			samples[i].Order = model.Order.Sample(&rng)
-			samples[i].S = i % 10
+			samples[i].S = i % Symbols
 		}
 
 		done := make(chan bool, 8)
@@ -431,11 +428,8 @@ func Text() {
 
 		samples = samples[:cut]
 		for sample := range samples {
-			solution := samples[sample].Solution.Sample()
-			for j := 0; j < solution.Rows; j++ {
-				index := samples[sample].S
-				stats[index]++
-			}
+			index := samples[sample].S
+			stats[index]++
 		}
 
 		max, index := 0, 0
@@ -450,12 +444,12 @@ func Text() {
 		}
 		return byte(index), max
 	}
-	symbol, max := search([]byte{}, 1)
+	symbol, max := search([]byte{}, 2)
 	fmt.Println(symbol, max)
 	symbols := []byte{symbol}
-	symbol, max = search(symbols, 1)
+	symbol, max = search(symbols, 2)
 	fmt.Println(symbol, max)
 	symbols = append(symbols, symbol)
-	symbol, max = search(symbols, 1)
+	symbol, max = search(symbols, 2)
 	fmt.Println(symbol, max)
 }
