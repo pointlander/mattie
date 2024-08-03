@@ -51,13 +51,16 @@ type Set struct {
 	Train []Example `json:"train"`
 }
 
+// Sets is many sets
+type Sets []Set
+
 // Load loads the data
-func Load() []Set {
+func Load() Sets {
 	dirs, err := os.ReadDir("ARC-AGI/data/training/")
 	if err != nil {
 		panic(err)
 	}
-	sets := make([]Set, len(dirs))
+	sets := make(Sets, len(dirs))
 	for i, dir := range dirs {
 		data, err := os.ReadFile("ARC-AGI/data/training/" + dir.Name())
 		if err != nil {
@@ -106,6 +109,7 @@ type Problem struct {
 	Opt    matrix.Matrix
 	Input  []Pair
 	Output Pair
+	Tail   int
 }
 
 // Size is the size of the input
@@ -114,11 +118,11 @@ func (p Problem) Size() int {
 	for _, input := range p.Input {
 		sum += len(input.Input.I) + len(input.Output.I) + 1 + input.Input.H + 1 + input.Output.H
 	}
-	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 2
+	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 2 + p.Tail
 }
 
 // GetSingleTrainingData gets the training data
-func GetSingleTrainingData(sets []Set, s, t int) Problem {
+func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
 	for _, t := range set.Train {
@@ -270,17 +274,20 @@ type State [Size]byte
 func Text() {
 	rng := matrix.Rand(1)
 	sets := Load()
-	opt := GetSingleTrainingData(sets, 0, 0)
-	model := Model{
-		Query:    matrix.NewRandomMatrix(Input, Input),
-		Key:      matrix.NewRandomMatrix(Input, Input),
-		Value:    matrix.NewRandomMatrix(Input, Input),
-		Solution: matrix.NewRandomMatrix(10, 1),
-		Order:    matrix.NewRandomMatrix(7, opt.Size()),
-	}
-	stats := make([]int, Symbols)
-	samples := make([]Sample, 1000)
-	{
+
+	var search func(suffix []byte, depth int) (byte, int)
+	search = func(suffix []byte, depth int) (byte, int) {
+		depth--
+		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
+		model := Model{
+			Query:    matrix.NewRandomMatrix(Input, Input),
+			Key:      matrix.NewRandomMatrix(Input, Input),
+			Value:    matrix.NewRandomMatrix(Input, Input),
+			Solution: matrix.NewRandomMatrix(10, 1),
+			Order:    matrix.NewRandomMatrix(7, opt.Size()),
+		}
+		stats := make([]int, Symbols)
+		samples := make([]Sample, 1000)
 		for i := range samples {
 			samples[i].Query = model.Query.Sample(&rng)
 			samples[i].Key = model.Key.Sample(&rng)
@@ -292,7 +299,7 @@ func Text() {
 
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opt := GetSingleTrainingData(sets, 0, 0)
+			opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 			sum := 0.0
 			order := sample.Order.Sample()
 			a, b := 0, 1
@@ -301,6 +308,11 @@ func Text() {
 				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
 				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 				a, b = b, a
+			}
+			index := 0
+			for i := len(suffix) + 1; i > 1; i-- {
+				opt.Opt.Data[Input*(opt.Size()-i)+int(suffix[index])] = 1
+				index++
 			}
 			params := opt.Opt.Data[Input*(opt.Size()-1):]
 			params[sample.S] = 1
@@ -418,7 +430,6 @@ func Text() {
 		}
 
 		samples = samples[:cut]
-		fmt.Println(cut)
 		for sample := range samples {
 			solution := samples[sample].Solution.Sample()
 			for j := 0; j < solution.Rows; j++ {
@@ -426,6 +437,25 @@ func Text() {
 				stats[index]++
 			}
 		}
+
+		max, index := 0, 0
+		for i, stat := range stats {
+			st := 0
+			if depth > 0 {
+				_, st = search(append(suffix, byte(i)), depth)
+			}
+			if st+stat > max {
+				max, index = st+stat, i
+			}
+		}
+		return byte(index), max
 	}
-	fmt.Println(stats)
+	symbol, max := search([]byte{}, 1)
+	fmt.Println(symbol, max)
+	symbols := []byte{symbol}
+	symbol, max = search(symbols, 1)
+	fmt.Println(symbol, max)
+	symbols = append(symbols, symbol)
+	symbol, max = search(symbols, 1)
+	fmt.Println(symbol, max)
 }
