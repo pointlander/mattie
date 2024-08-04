@@ -271,11 +271,14 @@ type State [Size]byte
 
 // Text mode
 func Text() {
-	rng := matrix.Rand(1)
 	sets := Load()
 
-	var search func(suffix []byte, depth int) (byte, int)
-	search = func(suffix []byte, depth int) (byte, int) {
+	type Result struct {
+		Symbol int
+		Score  int
+	}
+	var search func(suffix []byte, depth int, results chan Result)
+	search = func(suffix []byte, depth int, results chan Result) {
 		depth--
 		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 		model := Model{
@@ -286,6 +289,12 @@ func Text() {
 		}
 		stats := make([]int, Symbols)
 		samples := make([]Sample, 100*Symbols)
+		seed := uint32(1)
+		seed += uint32(depth)
+		for _, s := range suffix {
+			seed += uint32(s)
+		}
+		rng := matrix.Rand(seed)
 		for i := range samples {
 			samples[i].Query = model.Query.Sample(&rng)
 			samples[i].Key = model.Key.Sample(&rng)
@@ -293,7 +302,6 @@ func Text() {
 			samples[i].Order = model.Order.Sample(&rng)
 			samples[i].S = i % Symbols
 		}
-
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
 			opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
@@ -433,23 +441,44 @@ func Text() {
 		}
 
 		max, index := 0, 0
-		for i, stat := range stats {
-			st := 0
-			if depth > 0 {
-				_, st = search(append(suffix, byte(i)), depth)
+		if depth > 0 {
+			results := make(chan Result, Symbols)
+			for i := range stats {
+				s := append(suffix, byte(i))
+				go search(s, depth, results)
 			}
-			if st+stat > max {
-				max, index = st+stat, i
+			count := 0
+			for result := range results {
+				if score := result.Score + stats[result.Symbol]; score > max {
+					max, index = score, result.Symbol
+				}
+				count++
+				if count == Symbols {
+					break
+				}
+			}
+		} else {
+			for i, stat := range stats {
+				if stat > max {
+					max, index = stat, i
+				}
 			}
 		}
-		return byte(index), max
+		results <- Result{
+			Symbol: index,
+			Score:  max,
+		}
 	}
-	symbol, max := search([]byte{}, 2)
-	fmt.Println(symbol, max)
-	symbols := []byte{symbol}
-	symbol, max = search(symbols, 2)
-	fmt.Println(symbol, max)
-	symbols = append(symbols, symbol)
-	symbol, max = search(symbols, 2)
-	fmt.Println(symbol, max)
+	results := make(chan Result, Symbols)
+	search([]byte{}, 2, results)
+	result := <-results
+	fmt.Println(result.Symbol, result.Score)
+	symbols := []byte{byte(result.Symbol)}
+	search(symbols, 2, results)
+	result = <-results
+	fmt.Println(result.Symbol, result.Score)
+	symbols = append(symbols, byte(result.Symbol))
+	search(symbols, 2, results)
+	result = <-results
+	fmt.Println(result.Symbol, result.Score)
 }
