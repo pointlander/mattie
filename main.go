@@ -10,6 +10,7 @@ import (
 	"github.com/pointlander/mattie/original"
 	"github.com/pointlander/mattie/random"
 	"github.com/pointlander/mattie/text"
+	"github.com/pointlander/mattie/text2"
 )
 
 var (
@@ -19,6 +20,8 @@ var (
 	FlagRandom = flag.Bool("random", false, "random mode")
 	// TextMode is text mode
 	FlagText = flag.Bool("text", false, "text mode")
+	// Text2Mode is text 2 mode
+	FlagText2 = flag.Bool("text2", false, "text 2 mode")
 )
 
 func main() {
@@ -32,6 +35,9 @@ func main() {
 		return
 	} else if *FlagText {
 		text.Text()
+		return
+	} else if *FlagText2 {
+		text2.Text2()
 		return
 	}
 }
