@@ -7,6 +7,7 @@ package text2
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -275,10 +276,10 @@ func Text2() {
 
 	type Result struct {
 		Symbol int
-		Score  int
+		Score  float64
 	}
-	var search func(suffix []byte, depth int, results chan Result)
-	search = func(suffix []byte, depth int, results chan Result) {
+	var search func(seed uint32, suffix []byte, depth int, results chan Result)
+	search = func(seed uint32, suffix []byte, depth int, results chan Result) {
 		depth--
 		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 		model := Model{
@@ -287,169 +288,182 @@ func Text2() {
 			Value: matrix.NewRandomMatrix(Input, Input),
 			Order: matrix.NewRandomMatrix(7, opt.Size()),
 		}
-		stats := make([]int, Symbols)
-		samples := make([]Sample, 100*Symbols)
-		seed := uint32(1)
-		seed += uint32(depth)
-		for _, s := range suffix {
-			seed += uint32(s)
+		type Stat struct {
+			Cut  int
+			Cost float64
 		}
+		stats := make([]Stat, Symbols)
+		samples := make([]Sample, 100)
 		rng := matrix.Rand(seed)
 		for i := range samples {
 			samples[i].Query = model.Query.Sample(&rng)
 			samples[i].Key = model.Key.Sample(&rng)
 			samples[i].Value = model.Value.Sample(&rng)
 			samples[i].Order = model.Order.Sample(&rng)
-			samples[i].S = i % Symbols
 		}
-		done := make(chan bool, 8)
-		process := func(sample *Sample) {
-			opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
-			sum := 0.0
-			order := sample.Order.Sample()
-			a, b := 0, 1
-			for j := 0; j < opt.Opt.Rows; j++ {
-				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
-				a, b = b, a
+		for s := 0; s < Symbols; s++ {
+			for i := range samples {
+				samples[i].S = s
 			}
-			index := 0
-			for i := len(suffix) + 1; i > 1; i-- {
-				opt.Opt.Data[Input*(opt.Size()-i)+int(suffix[index])] = 1
-				index++
-			}
-			params := opt.Opt.Data[Input*(opt.Size()-1):]
-			params[sample.S] = 1
-			/*out := matrix.SelfAttention(
-			sample.Query.MulT(opt.Opt),
-			sample.Key.MulT(opt.Opt),
-			sample.Value.MulT(opt.Opt))*/
-			query := sample.Query.Sample()
-			key := sample.Key.Sample()
-			value := sample.Value.Sample()
-			entropy := matrix.SelfEntropy(
-				query.MulT(opt.Opt),
-				key.MulT(opt.Opt),
-				value.MulT(opt.Opt))
-			for _, value := range entropy {
-				sum += float64(value)
-			}
-			/*for j := 0; j < out.Rows; j++ {
-				for k := 0; k < out.Cols; k++ {
-					diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
-					sum += float64(diff*diff)
+			done := make(chan bool, 8)
+			process := func(sample *Sample) {
+				opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
+				sum := 0.0
+				order := sample.Order.Sample()
+				a, b := 0, 1
+				for j := 0; j < opt.Opt.Rows; j++ {
+					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
+					copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+					copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+					a, b = b, a
 				}
-			}*/
-			sample.Cost = sum
-			done <- true
-		}
-		flight, index, cpus := 0, 0, runtime.NumCPU()
-		for flight < cpus && index < len(samples) {
-			sample := &samples[index]
-			go process(sample)
-			index++
-			flight++
-		}
-		for index < len(samples) {
-			<-done
-			flight--
+				index := 0
+				for i := len(suffix) + 1; i > 1; i-- {
+					opt.Opt.Data[Input*(opt.Size()-i)+int(suffix[index])] = 1
+					index++
+				}
+				params := opt.Opt.Data[Input*(opt.Size()-1):]
+				params[sample.S] = 1
+				/*out := matrix.SelfAttention(
+				sample.Query.MulT(opt.Opt),
+				sample.Key.MulT(opt.Opt),
+				sample.Value.MulT(opt.Opt))*/
+				query := sample.Query.Sample()
+				key := sample.Key.Sample()
+				value := sample.Value.Sample()
+				entropy := matrix.SelfEntropy(
+					query.MulT(opt.Opt),
+					key.MulT(opt.Opt),
+					value.MulT(opt.Opt))
+				//sum += float64(entropy[len(entropy)-1])
+				for _, value := range entropy {
+					sum += float64(value)
+				}
+				/*for j := 0; j < out.Rows; j++ {
+					for k := 0; k < out.Cols; k++ {
+						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
+						sum += float64(diff*diff)
+					}
+				}*/
+				sample.Cost = sum
+				done <- true
+			}
+			flight, index, cpus := 0, 0, runtime.NumCPU()
+			for flight < cpus && index < len(samples) {
+				sample := &samples[index]
+				go process(sample)
+				index++
+				flight++
+			}
+			for index < len(samples) {
+				<-done
+				flight--
 
-			sample := &samples[index]
-			go process(sample)
-			index++
-			flight++
-		}
-		for i := 0; i < flight; i++ {
-			<-done
+				sample := &samples[index]
+				go process(sample)
+				index++
+				flight++
+			}
+			for i := 0; i < flight; i++ {
+				<-done
+			}
+
+			sort.Slice(samples, func(i, j int) bool {
+				return samples[i].Cost < samples[j].Cost
+			})
+			avg, vr := 0.0, 0.0
+			for i := 0; i < len(samples); i++ {
+				avg += samples[i].Cost
+			}
+			avg /= float64(len(samples))
+			for i := 0; i < len(samples); i++ {
+				diff := samples[i].Cost - avg
+				vr += diff * diff
+			}
+			vr /= float64(len(samples))
+			type Cut struct {
+				Reduction float64
+				Index     int
+			}
+			cuts := make(chan Cut, 8)
+			mvr := func(i int) {
+				avga, avgb := 0.0, 0.0
+				vara, varb := 0.0, 0.0
+				for j := 0; j < i; j++ {
+					avga += samples[j].Cost
+				}
+				avga /= float64(i)
+				for j := 0; j < i; j++ {
+					diff := samples[j].Cost - avga
+					vara += diff * diff
+				}
+				vara /= float64(i)
+				for j := i; j < len(samples); j++ {
+					avgb += samples[j].Cost
+				}
+				avgb /= float64(len(samples) - i)
+				for j := i; j < len(samples); j++ {
+					diff := samples[j].Cost - avgb
+					varb += diff * diff
+				}
+				varb /= float64(len(samples) - i)
+				reduction := vr - (vara + varb)
+				cuts <- Cut{
+					Reduction: reduction,
+					Index:     i,
+				}
+			}
+			maxReduction, cut := 0.0, 0
+			flight, index, cpus = 0, 1, runtime.NumCPU()
+			for flight < cpus && index < len(samples)-1 {
+				go mvr(index)
+				index++
+				flight++
+			}
+			for index < len(samples)-1 {
+				result := <-cuts
+				if result.Reduction > maxReduction {
+					maxReduction, cut = result.Reduction, result.Index
+				}
+				flight--
+
+				go mvr(index)
+				index++
+				flight++
+			}
+			for i := 0; i < flight; i++ {
+				result := <-cuts
+				if result.Reduction > maxReduction {
+					maxReduction, cut = result.Reduction, result.Index
+				}
+			}
+
+			cost := 0.0
+			for _, sample := range samples {
+				cost += sample.Cost
+			}
+			stats[s].Cut = cut
+			stats[s].Cost = cost
 		}
 
-		sort.Slice(samples, func(i, j int) bool {
-			return samples[i].Cost < samples[j].Cost
-		})
-		avg, vr := 0.0, 0.0
-		for i := 0; i < len(samples); i++ {
-			avg += samples[i].Cost
-		}
-		avg /= float64(len(samples))
-		for i := 0; i < len(samples); i++ {
-			diff := samples[i].Cost - avg
-			vr += diff * diff
-		}
-		vr /= float64(len(samples))
-		type Cut struct {
-			Reduction float64
-			Index     int
-		}
-		cuts := make(chan Cut, 8)
-		mvr := func(i int) {
-			avga, avgb := 0.0, 0.0
-			vara, varb := 0.0, 0.0
-			for j := 0; j < i; j++ {
-				avga += samples[j].Cost
-			}
-			avga /= float64(i)
-			for j := 0; j < i; j++ {
-				diff := samples[j].Cost - avga
-				vara += diff * diff
-			}
-			vara /= float64(i)
-			for j := i; j < len(samples); j++ {
-				avgb += samples[j].Cost
-			}
-			avgb /= float64(len(samples) - i)
-			for j := i; j < len(samples); j++ {
-				diff := samples[j].Cost - avgb
-				varb += diff * diff
-			}
-			varb /= float64(len(samples) - i)
-			reduction := vr - (vara + varb)
-			cuts <- Cut{
-				Reduction: reduction,
-				Index:     i,
-			}
-		}
-		maxReduction, cut := 0.0, 0
-		flight, index, cpus = 0, 1, runtime.NumCPU()
-		for flight < cpus && index < len(samples)-1 {
-			go mvr(index)
-			index++
-			flight++
-		}
-		for index < len(samples)-1 {
-			result := <-cuts
-			if result.Reduction > maxReduction {
-				maxReduction, cut = result.Reduction, result.Index
-			}
-			flight--
-
-			go mvr(index)
-			index++
-			flight++
-		}
-		for i := 0; i < flight; i++ {
-			result := <-cuts
-			if result.Reduction > maxReduction {
-				maxReduction, cut = result.Reduction, result.Index
-			}
+		for s, stat := range stats {
+			fmt.Println(s, stat.Cost)
 		}
 
-		samples = samples[:cut]
-		for sample := range samples {
-			index := samples[sample].S
-			stats[index]++
-		}
-
-		max, index := 0, 0
+		max, index := math.MaxFloat64, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
 			for i := range stats {
 				s := append(suffix, byte(i))
-				go search(s, depth, results)
+				seed := rng.Uint32() + 1
+				if seed == 0 {
+					seed = 1
+				}
+				go search(seed, s, depth, results)
 			}
 			count := 0
 			for result := range results {
-				if score := result.Score + stats[result.Symbol]; score > max {
+				if score := result.Score + stats[result.Symbol].Cost; score < max {
 					max, index = score, result.Symbol
 				}
 				count++
@@ -459,8 +473,8 @@ func Text2() {
 			}
 		} else {
 			for i, stat := range stats {
-				if stat > max {
-					max, index = stat, i
+				if stat.Cost < max {
+					max, index = stat.Cost, i
 				}
 			}
 		}
@@ -470,15 +484,15 @@ func Text2() {
 		}
 	}
 	results := make(chan Result, Symbols)
-	search([]byte{}, 2, results)
+	search(1, []byte{}, 1, results)
 	result := <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols := []byte{byte(result.Symbol)}
-	search(symbols, 2, results)
+	search(2, symbols, 1, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols = append(symbols, byte(result.Symbol))
-	search(symbols, 2, results)
+	search(3, symbols, 1, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 }
