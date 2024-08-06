@@ -272,13 +272,13 @@ type State [Size]byte
 // Text mode
 func Text() {
 	sets := Load()
-
+	const Samples = 1000 * Symbols
 	type Result struct {
 		Symbol int
 		Score  int
 	}
-	var search func(suffix []byte, depth int, results chan Result)
-	search = func(suffix []byte, depth int, results chan Result) {
+	var search func(seed uint32, suffix []byte, depth int, results chan Result)
+	search = func(seed uint32, suffix []byte, depth int, results chan Result) {
 		depth--
 		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 		model := Model{
@@ -288,12 +288,7 @@ func Text() {
 			Order: matrix.NewRandomMatrix(7, opt.Size()),
 		}
 		stats := make([]int, Symbols)
-		samples := make([]Sample, 100*Symbols)
-		seed := uint32(1)
-		seed += uint32(depth)
-		for _, s := range suffix {
-			seed += uint32(s)
-		}
+		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := range samples {
 			samples[i].Query = model.Query.Sample(&rng)
@@ -367,7 +362,7 @@ func Text() {
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
 		})
-		avg, vr := 0.0, 0.0
+		/*avg, vr := 0.0, 0.0
 		for i := 0; i < len(samples); i++ {
 			avg += samples[i].Cost
 		}
@@ -432,12 +427,19 @@ func Text() {
 			if result.Reduction > maxReduction {
 				maxReduction, cut = result.Reduction, result.Index
 			}
-		}
+		}*/
 
-		samples = samples[:cut]
+		acc := [Symbols]int{}
 		for sample := range samples {
 			index := samples[sample].S
-			stats[index]++
+			acc[index]++
+			max, sym := 0, 0
+			for key, value := range acc {
+				if value > max {
+					max, sym = value, key
+				}
+			}
+			stats[sym]++
 		}
 
 		max, index := 0, 0
@@ -445,7 +447,11 @@ func Text() {
 			results := make(chan Result, Symbols)
 			for i := range stats {
 				s := append(suffix, byte(i))
-				go search(s, depth, results)
+				seed := rng.Uint32() + 1
+				if seed == 0 {
+					seed = 1
+				}
+				go search(seed, s, depth, results)
 			}
 			count := 0
 			for result := range results {
@@ -470,15 +476,15 @@ func Text() {
 		}
 	}
 	results := make(chan Result, Symbols)
-	search([]byte{}, 2, results)
+	search(1, []byte{}, 1, results)
 	result := <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols := []byte{byte(result.Symbol)}
-	search(symbols, 2, results)
+	search(2, symbols, 1, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols = append(symbols, byte(result.Symbol))
-	search(symbols, 2, results)
+	search(3, symbols, 1, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 }
