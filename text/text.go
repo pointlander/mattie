@@ -260,20 +260,20 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 
 // Model model is the random matrix model
 type Model struct {
-	Query    matrix.RandomMatrix
-	Key      matrix.RandomMatrix
-	Value    matrix.RandomMatrix
-	Solution matrix.RandomMatrix
-	Order    matrix.RandomMatrix
+	Query    matrix.CompressedRandomMatrix
+	Key      matrix.CompressedRandomMatrix
+	Value    matrix.CompressedRandomMatrix
+	Solution matrix.CompressedRandomMatrix
+	Order    matrix.CompressedRandomMatrix
 }
 
 // Sample is a sample
 type Sample struct {
-	Query matrix.Generator
-	Key   matrix.Generator
-	Value matrix.Generator
+	Query matrix.CompressedGenerator
+	Key   matrix.CompressedGenerator
+	Value matrix.CompressedGenerator
 	S     int
-	Order matrix.Generator
+	Order matrix.CompressedGenerator
 	Cost  float64
 	Grid  [][]int
 }
@@ -301,10 +301,10 @@ func Text() {
 		depth--
 		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 		model := Model{
-			Query: matrix.NewRandomMatrix(Input, Input),
-			Key:   matrix.NewRandomMatrix(Input, Input),
-			Value: matrix.NewRandomMatrix(Input, Input),
-			Order: matrix.NewRandomMatrix(7, opt.Size()),
+			Query: matrix.NewCompressedRandomMatrix(Input, Input),
+			Key:   matrix.NewCompressedRandomMatrix(Input, Input),
+			Value: matrix.NewCompressedRandomMatrix(Input, Input),
+			Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
 		}
 		stats := make([]int, Symbols)
 		samples := make([]Sample, Samples)
