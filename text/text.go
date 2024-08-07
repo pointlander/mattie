@@ -30,7 +30,7 @@ const (
 	// Symbols
 	Symbols = 10 + 3 + 3
 	// Input is the network input size
-	Input = Symbols + 2*7
+	Input = Symbols + 2*7 + 10
 	// Width is the width of the markov model
 	Width = 3
 	// Height is the height of the markov model
@@ -79,6 +79,13 @@ func Load() Sets {
 	}
 	fmt.Println("test", test)
 	fmt.Println("train", train)
+	max := 0
+	for _, set := range sets {
+		if len(set.Train) > max {
+			max = len(set.Train)
+		}
+	}
+	fmt.Println("max train", max)
 	return sets
 }
 
@@ -191,16 +198,18 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	}
 	problem := Problem{
 		Count: len(train),
+		Tail:  tail,
 	}
 	problem.Input = train
 	problem.Output = test[t]
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	index := 0
-	for _, pair := range train {
+	for j, pair := range train {
 		problem.Opt.Data[index+10] = 1
 		index += Input
 		for i, p := range pair.Input.I {
 			problem.Opt.Data[index+int(p.C)] = 1
+			problem.Opt.Data[index+Input-10+j] = 1
 			index += Input
 			if (i+1)%pair.Input.W == 0 && i+1 != len(pair.Input.I) {
 				problem.Opt.Data[index+11] = 1
@@ -213,6 +222,7 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 		index += Input
 		for i, p := range pair.Output.I {
 			problem.Opt.Data[index+int(p.C)] = 1
+			problem.Opt.Data[index+Input-10+j] = 1
 			index += Input
 			if (i+1)%pair.Output.W == 0 && i+1 != len(pair.Output.I) {
 				problem.Opt.Data[index+14] = 1
@@ -226,6 +236,9 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	index += Input
 	for i, p := range test[t].Input.I {
 		problem.Opt.Data[index+int(p.C)] = 1
+		for j := range train {
+			problem.Opt.Data[index+Input-10+j] = 1
+		}
 		index += Input
 		if (i+1)%test[t].Input.W == 0 && i+1 != len(test[t].Input.I) {
 			problem.Opt.Data[index+11] = 1
@@ -236,6 +249,12 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	index += Input
 	problem.Opt.Data[index+13] = 1
 	index += Input
+	for j := 0; j < 1+tail; j++ {
+		for j := range train {
+			problem.Opt.Data[index+Input-10+j] = 1
+		}
+		index += Input
+	}
 	return problem
 }
 
