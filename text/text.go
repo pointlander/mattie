@@ -291,7 +291,10 @@ type State [Size]byte
 // Text mode
 func Text() {
 	sets := Load()
-	const Samples = 1000 * Symbols
+	const (
+		SampleSets = 1000
+		Samples    = SampleSets * Symbols
+	)
 	type Result struct {
 		Symbol int
 		Score  int
@@ -309,12 +312,18 @@ func Text() {
 		stats := make([]int, Symbols)
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
-		for i := range samples {
-			samples[i].Query = model.Query.Sample(&rng)
-			samples[i].Key = model.Key.Sample(&rng)
-			samples[i].Value = model.Value.Sample(&rng)
-			samples[i].Order = model.Order.Sample(&rng)
-			samples[i].S = i % Symbols
+		for i := 0; i < SampleSets; i++ {
+			query := model.Query.Sample(&rng)
+			key := model.Key.Sample(&rng)
+			value := model.Value.Sample(&rng)
+			order := model.Order.Sample(&rng)
+			for j := 0; j < Symbols; j++ {
+				samples[i*Symbols+j].Query = query
+				samples[i*Symbols+j].Key = key
+				samples[i*Symbols+j].Value = value
+				samples[i*Symbols+j].Order = order
+				samples[i*Symbols+j].S = j
+			}
 		}
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
