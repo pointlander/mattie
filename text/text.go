@@ -292,7 +292,7 @@ type State [Size]byte
 func Text() {
 	sets := Load()
 	const (
-		SampleSets = 1000
+		SampleSets = 4000
 		Samples    = SampleSets * Symbols
 	)
 	type Result struct {
@@ -313,11 +313,11 @@ func Text() {
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
-			query := model.Query.Sample(&rng)
-			key := model.Key.Sample(&rng)
-			value := model.Value.Sample(&rng)
-			order := model.Order.Sample(&rng)
 			for j := 0; j < Symbols; j++ {
+				query := model.Query.Sample(&rng)
+				key := model.Key.Sample(&rng)
+				value := model.Value.Sample(&rng)
+				order := model.Order.Sample(&rng)
 				samples[i*Symbols+j].Query = query
 				samples[i*Symbols+j].Key = key
 				samples[i*Symbols+j].Value = value
@@ -469,12 +469,15 @@ func Text() {
 			}
 			stats[sym]++
 		}
+		fmt.Println(stats)
 
 		max, index := 0, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
 			for i := range stats {
-				s := append(suffix, byte(i))
+				cp := make([]byte, len(suffix))
+				copy(cp, suffix)
+				s := append(cp, byte(i))
 				seed := rng.Uint32() + 1
 				if seed == 0 {
 					seed = 1
