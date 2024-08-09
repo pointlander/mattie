@@ -296,11 +296,12 @@ func Text() {
 		Samples    = SampleSets * Symbols
 	)
 	type Result struct {
-		Symbol int
-		Score  int
+		Context int
+		Symbol  int
+		Score   int
 	}
-	var search func(seed uint32, suffix []byte, depth int, results chan Result)
-	search = func(seed uint32, suffix []byte, depth int, results chan Result) {
+	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
+	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
 		depth--
 		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
 		model := Model{
@@ -482,12 +483,12 @@ func Text() {
 				if seed == 0 {
 					seed = 1
 				}
-				go search(seed, s, depth, results)
+				go search(i, seed, s, depth, results)
 			}
 			count := 0
 			for result := range results {
-				if score := result.Score + stats[result.Symbol]; score > max {
-					max, index = score, result.Symbol
+				if score := result.Score + stats[result.Context]; score > max {
+					max, index = score, result.Context
 				}
 				count++
 				if count == Symbols {
@@ -502,20 +503,21 @@ func Text() {
 			}
 		}
 		results <- Result{
-			Symbol: index,
-			Score:  max,
+			Context: context,
+			Symbol:  index,
+			Score:   max,
 		}
 	}
 	results := make(chan Result, Symbols)
-	search(1, []byte{}, 1, results)
+	search(0, 1, []byte{}, 2, results)
 	result := <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols := []byte{byte(result.Symbol)}
-	search(2, symbols, 1, results)
+	search(0, 2, symbols, 2, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols = append(symbols, byte(result.Symbol))
-	search(3, symbols, 1, results)
+	search(0, 3, symbols, 2, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 }
