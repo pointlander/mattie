@@ -125,7 +125,7 @@ func (p Problem) Size() int {
 	for _, input := range p.Input {
 		sum += len(input.Input.I) + len(input.Output.I) + 1 + input.Input.H + 1 + input.Output.H
 	}
-	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 2 + p.Tail
+	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 3 + p.Tail
 }
 
 // GetSingleTrainingData gets the training data
@@ -272,7 +272,7 @@ type Sample struct {
 	Query matrix.CompressedGenerator
 	Key   matrix.CompressedGenerator
 	Value matrix.CompressedGenerator
-	S     int
+	S     [2]int
 	Order matrix.CompressedGenerator
 	Cost  float64
 	Grid  [][]int
@@ -292,8 +292,8 @@ type State [Size]byte
 func Text() {
 	sets := Load()
 	const (
-		SampleSets = 4000
-		Samples    = SampleSets * Symbols
+		SampleSets = 400
+		Samples    = SampleSets * Symbols * Symbols
 	)
 	type Result struct {
 		Symbol int
@@ -314,15 +314,18 @@ func Text() {
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
 			for j := 0; j < Symbols; j++ {
-				query := model.Query.Sample(&rng)
-				key := model.Key.Sample(&rng)
-				value := model.Value.Sample(&rng)
-				order := model.Order.Sample(&rng)
-				samples[i*Symbols+j].Query = query
-				samples[i*Symbols+j].Key = key
-				samples[i*Symbols+j].Value = value
-				samples[i*Symbols+j].Order = order
-				samples[i*Symbols+j].S = j
+				for k := 0; k < Symbols; k++ {
+					query := model.Query.Sample(&rng)
+					key := model.Key.Sample(&rng)
+					value := model.Value.Sample(&rng)
+					order := model.Order.Sample(&rng)
+					samples[i*Symbols*Symbols+j*Symbols+k].Query = query
+					samples[i*Symbols*Symbols+j*Symbols+k].Key = key
+					samples[i*Symbols*Symbols+j*Symbols+k].Value = value
+					samples[i*Symbols*Symbols+j*Symbols+k].Order = order
+					samples[i*Symbols*Symbols+j*Symbols+k].S[0] = j
+					samples[i*Symbols*Symbols+j*Symbols+k].S[1] = k
+				}
 			}
 		}
 		done := make(chan bool, 8)
@@ -333,17 +336,21 @@ func Text() {
 			a, b := 0, 1
 			for j := 0; j < opt.Opt.Rows; j++ {
 				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7],
+					order.Data[x*7:(x+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7],
+					order.Data[(y)*7:(y+1)*7])
 				a, b = b, a
 			}
 			index := 0
-			for i := len(suffix) + 1; i > 1; i-- {
+			for i := len(suffix) + 2; i > 2; i-- {
 				opt.Opt.Data[Input*(opt.Size()-i)+int(suffix[index])] = 1
 				index++
 			}
-			params := opt.Opt.Data[Input*(opt.Size()-1):]
-			params[sample.S] = 1
+			params := opt.Opt.Data[Input*(opt.Size()-2):]
+			params[sample.S[0]] = 1
+			params = opt.Opt.Data[Input*(opt.Size()-1):]
+			params[sample.S[1]] = 1
 			/*out := matrix.SelfAttention(
 			sample.Query.MulT(opt.Opt),
 			sample.Key.MulT(opt.Opt),
@@ -457,14 +464,17 @@ func Text() {
 			}
 		}*/
 
-		acc := [Symbols]int{}
+		acc := [Symbols][Symbols]int{}
 		for sample := range samples {
-			index := samples[sample].S
-			acc[index]++
+			s0 := samples[sample].S[0]
+			s1 := samples[sample].S[1]
+			acc[s0][s1]++
 			max, sym := 0, 0
-			for key, value := range acc {
-				if value > max {
-					max, sym = value, key
+			for i := range acc {
+				for _, value := range acc[i] {
+					if value > max {
+						max, sym = value, i
+					}
 				}
 			}
 			stats[sym]++
