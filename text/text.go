@@ -7,6 +7,7 @@ package text
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -298,7 +299,7 @@ func Text() {
 	type Result struct {
 		Context int
 		Symbol  int
-		Score   int
+		Score   float64
 	}
 	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
 	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
@@ -310,7 +311,7 @@ func Text() {
 			Value: matrix.NewCompressedRandomMatrix(Input, Input),
 			Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
 		}
-		stats := make([]int, Symbols)
+		stats := make([]float64, Symbols)
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
@@ -459,20 +460,21 @@ func Text() {
 		}*/
 
 		acc := [Symbols]int{}
+		length := float64(len(samples))
 		for sample := range samples {
 			index := samples[sample].S
 			acc[index]++
-			max, sym := 0, 0
+			max, sym := 0.0, 0
 			for key, value := range acc {
-				if value > max {
-					max, sym = value, key
+				if float64(value) > max {
+					max, sym = float64(value), key
 				}
 			}
-			stats[sym]++
+			stats[sym] += math.Exp(-max / length)
 		}
 		fmt.Println(stats)
 
-		max, index := 0, 0
+		max, index := 0.0, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
 			for i := range stats {
