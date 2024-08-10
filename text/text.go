@@ -7,7 +7,6 @@ package text
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -460,17 +459,22 @@ func Text() {
 		}*/
 
 		acc := [Symbols]int{}
-		length := float64(len(samples))
+		factor := [Symbols]int{}
 		for sample := range samples {
 			index := samples[sample].S
 			acc[index]++
+			scale := sample - factor[index]
+			factor[index] = sample
+			if scale == 0 {
+				scale = 1
+			}
 			max, sym := 0.0, 0
 			for key, value := range acc {
 				if float64(value) > max {
 					max, sym = float64(value), key
 				}
 			}
-			stats[sym] += math.Exp(-max / length)
+			stats[sym] += 1 / float64(scale)
 		}
 		fmt.Println(stats)
 
@@ -511,15 +515,15 @@ func Text() {
 		}
 	}
 	results := make(chan Result, Symbols)
-	search(0, 1, []byte{}, 2, results)
+	search(0, 1, []byte{}, 1, results)
 	result := <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols := []byte{byte(result.Symbol)}
-	search(0, 2, symbols, 2, results)
+	search(0, 2, symbols, 1, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols = append(symbols, byte(result.Symbol))
-	search(0, 3, symbols, 2, results)
+	search(0, 3, symbols, 1, results)
 	result = <-results
 	fmt.Println(result.Symbol, result.Score)
 }
