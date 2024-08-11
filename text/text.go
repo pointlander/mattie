@@ -7,11 +7,13 @@ package text
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"sort"
 
 	"github.com/pointlander/matrix"
+	"github.com/pointlander/matrix/vector"
 )
 
 const (
@@ -37,7 +39,54 @@ const (
 	Height = 3
 	// Size is the size of the markov model
 	Size = Width*Height - 1
+	// S is the scaling factor for the softmax
+	S = 1.0 - 1e-300
 )
+
+func softmax(values []float32) {
+	max := float32(0.0)
+	for _, v := range values {
+		if v > max {
+			max = v
+		}
+	}
+	s := max * S
+	sum := float32(0.0)
+	for j, value := range values {
+		values[j] = float32(math.Exp(float64(value - s)))
+		sum += values[j]
+	}
+	for j, value := range values {
+		values[j] = value / sum
+	}
+}
+
+// SelfAttention computes the self attention of Q, K, V
+func SelfAttention(Q, K, V matrix.Matrix) matrix.Matrix {
+	o := matrix.Matrix{
+		Cols: V.Cols,
+		Rows: K.Rows,
+		Data: make([]float32, 0, V.Rows*K.Rows),
+	}
+	outputs, values := make([]float32, V.Cols), make([]float32, Q.Rows)
+	V = V.T()
+	for i := 0; i < K.Rows; i++ {
+		K := K.Data[i*K.Cols : (i+1)*K.Cols]
+		for j := 0; j < Q.Rows; j++ {
+			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
+			values[j] = vector.Dot(K, Q)
+		}
+		softmax(values)
+
+		for j := 0; j < V.Rows; j++ {
+			V := V.Data[j*V.Cols : (j+1)*V.Cols]
+			outputs[j] = vector.Dot(values, V)
+		}
+		softmax(outputs)
+		o.Data = append(o.Data, outputs...)
+	}
+	return o
+}
 
 // Example is a learning example
 type Example struct {
