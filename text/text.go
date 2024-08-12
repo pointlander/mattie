@@ -30,7 +30,7 @@ const (
 
 const (
 	// Symbols
-	Symbols = 10 + 3 + 3 + 5
+	Symbols = 10 + 3 + 3 //+ 5
 	// Input is the network input size
 	Input = Symbols + 2*7 + 10
 	// Width is the width of the markov model
@@ -182,6 +182,7 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
 	for x, t := range set.Train {
+		_ = x
 		pair := Pair{
 			Class: s,
 			Input: Image{
@@ -196,9 +197,9 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 		for j, v := range t.Input {
 			for i := range v {
 				pix := v[i]
-				if pix == 0 {
+				/*if pix == 0 {
 					pix = 16 + byte(x)
-				}
+				}*/
 				pair.Input.I = append(pair.Input.I, Pixel{
 					C: pix,
 					X: i,
@@ -209,9 +210,9 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 		for j, v := range t.Output {
 			for i := range v {
 				pix := v[i]
-				if pix == 0 {
+				/*if pix == 0 {
 					pix = 16 + byte(x)
-				}
+				}*/
 				pair.Output.I = append(pair.Output.I, Pixel{
 					C: pix,
 					X: i,
@@ -413,7 +414,7 @@ func Text() {
 				query.MulT(opt.Opt),
 				key.MulT(opt.Opt),
 				value.MulT(opt.Opt))
-			for _, value := range entropy {
+			for _, value := range entropy[:len(entropy)-1] {
 				sum += float64(value)
 			}
 			/*for j := 0; j < out.Rows; j++ {
@@ -448,7 +449,7 @@ func Text() {
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
 		})
-		/*avg, vr := 0.0, 0.0
+		avg, vr := 0.0, 0.0
 		for i := 0; i < len(samples); i++ {
 			avg += samples[i].Cost
 		}
@@ -462,7 +463,7 @@ func Text() {
 			Reduction float64
 			Index     int
 		}
-		cuts := make(chan Cut, 8)
+		/*cuts := make(chan Cut, 8)
 		mvr := func(i int) {
 			avga, avgb := 0.0, 0.0
 			vara, varb := 0.0, 0.0
@@ -515,7 +516,7 @@ func Text() {
 			}
 		}*/
 
-		acc := [Symbols]int{}
+		/*acc := [Symbols]int{}
 		factor := [Symbols]int{}
 		for sample := range samples {
 			index := samples[sample].S
@@ -532,13 +533,20 @@ func Text() {
 				}
 			}
 			stats[sym] += 1 / float64(scale)
+		}*/
+		vr = math.Sqrt(vr)
+		for sample := range samples {
+			x := samples[sample].Cost
+			g := math.Exp(-(x-avg)*(x-avg)/(2*vr*vr)) / (vr * math.Sqrt(2*math.Pi))
+			index := samples[sample].S
+			stats[index] += 1 / g
 		}
 		fmt.Println(stats)
 
 		max, index := 0.0, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
-			for i := range stats[:16] {
+			for i := range stats /*[:16]*/ {
 				cp := make([]byte, len(suffix))
 				copy(cp, suffix)
 				s := append(cp, byte(i))
@@ -559,7 +567,7 @@ func Text() {
 				}
 			}
 		} else {
-			for i, stat := range stats[:16] {
+			for i, stat := range stats /*[:16]*/ {
 				if stat > max {
 					max, index = stat, i
 				}
