@@ -82,7 +82,7 @@ func SelfAttention(Q, K, V matrix.Matrix) matrix.Matrix {
 			V := V.Data[j*V.Cols : (j+1)*V.Cols]
 			outputs[j] = vector.Dot(values, V)
 		}
-		softmax(outputs)
+		//softmax(outputs)
 		o.Data = append(o.Data, outputs...)
 	}
 	return o
@@ -410,13 +410,43 @@ func Text() {
 			query := sample.Query.Sample()
 			key := sample.Key.Sample()
 			value := sample.Value.Sample()
-			entropy := matrix.SelfEntropy(
+			entropy := matrix.SelfAttention(
 				query.MulT(opt.Opt),
 				key.MulT(opt.Opt),
 				value.MulT(opt.Opt))
-			for _, value := range entropy[:len(entropy)-1] {
-				sum += float64(value)
+			cost := make([]float32, entropy.Rows)
+			for i := 0; i < entropy.Cols; i++ {
+				for j := 0; j < entropy.Rows; j++ {
+					cost[j] = entropy.Data[j*entropy.Cols+i]
+				}
+				softmax(cost)
+				e := 0.0
+				for j := range cost {
+					ee := float64(cost[j])
+					e -= ee * math.Log(ee)
+				}
+				sum += e
 			}
+			cost = make([]float32, entropy.Cols)
+			for i := 0; i < entropy.Rows; i++ {
+				for j := 0; j < entropy.Cols; j++ {
+					cost[j] = entropy.Data[i*entropy.Cols+j]
+				}
+				softmax(cost)
+				e := 0.0
+				for j := range cost {
+					ee := float64(cost[j])
+					e -= ee * math.Log(ee)
+				}
+				sum += e
+			}
+			/*for i := 0; i < entropy.Rows; i++ {
+				softmax(entropy.Data[i*entropy.Cols : (i+1)*entropy.Cols])
+				for j := 0; j < entropy.Cols; j++ {
+					e := float64(entropy.Data[i*entropy.Cols+j])
+					sample.Cost[j] -= e * math.Log(e)
+				}
+			}*/
 			/*for j := 0; j < out.Rows; j++ {
 				for k := 0; k < out.Cols; k++ {
 					diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
@@ -459,11 +489,11 @@ func Text() {
 			vr += diff * diff
 		}
 		vr /= float64(len(samples))
-		type Cut struct {
+		/*type Cut struct {
 			Reduction float64
 			Index     int
 		}
-		/*cuts := make(chan Cut, 8)
+		cuts := make(chan Cut, 8)
 		mvr := func(i int) {
 			avga, avgb := 0.0, 0.0
 			vara, varb := 0.0, 0.0
