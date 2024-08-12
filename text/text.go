@@ -459,11 +459,11 @@ func Text() {
 			vr += diff * diff
 		}
 		vr /= float64(len(samples))
-		type Cut struct {
+		/*type Cut struct {
 			Reduction float64
 			Index     int
 		}
-		/*cuts := make(chan Cut, 8)
+		cuts := make(chan Cut, 8)
 		mvr := func(i int) {
 			avga, avgb := 0.0, 0.0
 			vara, varb := 0.0, 0.0
