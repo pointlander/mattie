@@ -538,7 +538,7 @@ func Text() {
 		max, index := 0.0, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
-			for i := range stats {
+			for i := range stats[:16] {
 				cp := make([]byte, len(suffix))
 				copy(cp, suffix)
 				s := append(cp, byte(i))
@@ -559,14 +559,11 @@ func Text() {
 				}
 			}
 		} else {
-			for i, stat := range stats {
+			for i, stat := range stats[:16] {
 				if stat > max {
 					max, index = stat, i
 				}
 			}
-		}
-		if index >= 16 {
-			index = 0
 		}
 		results <- Result{
 			Context: context,
