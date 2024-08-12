@@ -30,7 +30,7 @@ const (
 
 const (
 	// Symbols
-	Symbols = 10 + 3 + 3
+	Symbols = 10 + 3 + 3 + 5
 	// Input is the network input size
 	Input = Symbols + 2*7 + 10
 	// Width is the width of the markov model
@@ -181,7 +181,7 @@ func (p Problem) Size() int {
 func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	train, test := make([]Pair, 0, 8), make([]Pair, 0, 8)
 	set := sets[s]
-	for _, t := range set.Train {
+	for x, t := range set.Train {
 		pair := Pair{
 			Class: s,
 			Input: Image{
@@ -195,8 +195,12 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 		}
 		for j, v := range t.Input {
 			for i := range v {
+				pix := v[i]
+				if pix == 0 {
+					pix = 16 + byte(x)
+				}
 				pair.Input.I = append(pair.Input.I, Pixel{
-					C: v[i],
+					C: pix,
 					X: i,
 					Y: j,
 				})
@@ -204,8 +208,12 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 		}
 		for j, v := range t.Output {
 			for i := range v {
+				pix := v[i]
+				if pix == 0 {
+					pix = 16 + byte(x)
+				}
 				pair.Output.I = append(pair.Output.I, Pixel{
-					C: v[i],
+					C: pix,
 					X: i,
 					Y: j,
 				})
@@ -556,6 +564,9 @@ func Text() {
 					max, index = stat, i
 				}
 			}
+		}
+		if index >= 16 {
+			index = 0
 		}
 		results <- Result{
 			Context: context,
