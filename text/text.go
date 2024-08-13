@@ -414,7 +414,7 @@ func Text() {
 				query.MulT(opt.Opt),
 				key.MulT(opt.Opt),
 				value.MulT(opt.Opt))
-			for _, value := range entropy[:len(entropy)-1] {
+			for _, value := range entropy {
 				sum += float64(value)
 			}
 			/*for j := 0; j < out.Rows; j++ {
@@ -584,11 +584,10 @@ func Text() {
 	result := <-results
 	fmt.Println(result.Symbol, result.Score)
 	symbols := []byte{byte(result.Symbol)}
-	search(0, 2, symbols, 1, results)
-	result = <-results
-	fmt.Println(result.Symbol, result.Score)
-	symbols = append(symbols, byte(result.Symbol))
-	search(0, 3, symbols, 1, results)
-	result = <-results
-	fmt.Println(result.Symbol, result.Score)
+	for i := 0; i < 100; i++ {
+		search(0, uint32(i)+2, symbols, 1, results)
+		result = <-results
+		fmt.Println(result.Symbol, result.Score)
+		symbols = append(symbols, byte(result.Symbol))
+	}
 }
