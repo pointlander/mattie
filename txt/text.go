@@ -8,7 +8,6 @@ import (
 	"compress/bzip2"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -68,7 +67,7 @@ type Sets []Set
 
 // Load load text data
 func Load() Sets {
-	sets := make(Sets, 1)
+	sets := make(Sets, 2)
 	input, err := os.Open("1513.txt.utf-8.bz2")
 	if err != nil {
 		panic(err)
@@ -80,6 +79,8 @@ func Load() Sets {
 		panic(err)
 	}
 	sets[0].Text = data
+
+	sets[1].Text = []byte("abcabcabcabc")
 	return sets
 }
 
@@ -88,27 +89,45 @@ type Problem struct {
 	Opt    matrix.Matrix
 	Input  []byte
 	Output []byte
+	Count  int
 }
 
 // Size is the size of the input
 func (p Problem) Size() int {
-	return 512 + 1
+	return p.Count
 }
 
 // GetSingleTrainingData gets the training data
 func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
+	if s == 0 {
+		set := sets[s]
+		problem := Problem{
+			Input:  set.Text[2048 : 2048+512],
+			Output: set.Text[2048+512 : 2048+512+1],
+			Count:  512 + 1,
+		}
+		problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
+		index := 0
+		for i := 0; i < 512; i++ {
+			problem.Opt.Data[index+To[set.Text[i+2048]]] = 1
+			index += Input
+		}
+		return problem
+	}
 	set := sets[s]
 	problem := Problem{
-		Input:  set.Text[2048 : 2048+512],
-		Output: set.Text[2048+512 : 2048+512+1],
+		Input:  set.Text[:len(set.Text)-1],
+		Output: set.Text[len(set.Text)-1 : len(set.Text)],
+		Count:  len(set.Text),
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	index := 0
-	for i := 0; i < 512; i++ {
-		problem.Opt.Data[index+To[set.Text[i+2048]]] = 1
+	for i := 0; i < len(set.Text)-1; i++ {
+		problem.Opt.Data[index+To[set.Text[i]]] = 1
 		index += Input
 	}
 	return problem
+
 }
 
 // Model model is the random matrix model
@@ -141,8 +160,8 @@ type Stat struct {
 func Text() {
 	sets := Load()
 	const (
-		SampleSets = 100
-		Samples    = SampleSets * Symbols
+		SampleSets = 1000
+		Samples    = SampleSets * 3
 	)
 	type Result struct {
 		Context int
@@ -152,7 +171,7 @@ func Text() {
 	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
 	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
 		depth--
-		opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
+		opt := sets.GetSingleTrainingData(len(suffix), 1, 0)
 		model := Model{
 			Query: matrix.NewCompressedRandomMatrix(Input, Input),
 			Key:   matrix.NewCompressedRandomMatrix(Input, Input),
@@ -163,21 +182,21 @@ func Text() {
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
-			for j := 0; j < Symbols; j++ {
+			for j := 0; j < 3; j++ {
 				query := model.Query.Sample(&rng)
 				key := model.Key.Sample(&rng)
 				value := model.Value.Sample(&rng)
 				order := model.Order.Sample(&rng)
-				samples[i*Symbols+j].Query = query
-				samples[i*Symbols+j].Key = key
-				samples[i*Symbols+j].Value = value
-				samples[i*Symbols+j].Order = order
-				samples[i*Symbols+j].S = j
+				samples[i*3+j].Query = query
+				samples[i*3+j].Key = key
+				samples[i*3+j].Value = value
+				samples[i*3+j].Order = order
+				samples[i*3+j].S = j
 			}
 		}
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
+			opt := sets.GetSingleTrainingData(len(suffix), 1, 0)
 			sum := 0.0
 			order := sample.Order.Sample()
 			a, b := 0, 1
@@ -240,7 +259,7 @@ func Text() {
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
 		})
-		avg, vr := 0.0, 0.0
+		/*avg, vr := 0.0, 0.0
 		for i := 0; i < len(samples); i++ {
 			avg += samples[i].Cost
 		}
@@ -250,7 +269,7 @@ func Text() {
 			vr += diff * diff
 		}
 		vr /= float64(len(samples))
-		/*type Cut struct {
+		type Cut struct {
 			Reduction float64
 			Index     int
 		}
@@ -307,7 +326,7 @@ func Text() {
 			}
 		}*/
 
-		/*acc := [Symbols]int{}
+		acc := [Symbols]int{}
 		factor := [Symbols]int{}
 		for sample := range samples {
 			index := samples[sample].S
@@ -324,14 +343,14 @@ func Text() {
 				}
 			}
 			stats[sym] += 1 / float64(scale)
-		}*/
-		vr = math.Sqrt(vr)
+		}
+		/*vr = math.Sqrt(vr)
 		for sample := range samples {
 			x := samples[sample].Cost
 			g := math.Exp(-(x-avg)*(x-avg)/(2*vr*vr)) / (vr * math.Sqrt(2*math.Pi))
 			index := samples[sample].S
-			stats[index] += g
-		}
+			stats[index] += 1 / g
+		}*/
 		fmt.Println(stats)
 
 		max, index := 0.0, 0
@@ -370,7 +389,7 @@ func Text() {
 			Score:   max,
 		}
 	}
-	opt := sets.GetSingleTrainingData(0, 0, 0)
+	opt := sets.GetSingleTrainingData(0, 1, 0)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	results := make(chan Result, Symbols)
