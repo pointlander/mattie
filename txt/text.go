@@ -173,7 +173,7 @@ type Stat struct {
 func Text() {
 	sets := Load()
 	const (
-		SampleSets = 1000
+		SampleSets = 2000
 		Samples    = SampleSets * 4
 	)
 	type Result struct {
