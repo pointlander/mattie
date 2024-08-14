@@ -80,7 +80,7 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcabcabcabc")
+	sets[1].Text = []byte("abcdabcdabcdabcd")
 	return sets
 }
 
@@ -134,6 +134,8 @@ func (sets Sets) GetSingleTrainingData(tail []byte, s, t int) Problem {
 		}
 		if i-1 > 0 {
 			problem.Opt.Data[index+Symbols+To[txt[(i-1)]]] = 1
+		} else {
+			problem.Opt.Data[index+Symbols+To[txt[(i)]]] = 1
 		}
 		index += Input
 	}
@@ -172,7 +174,7 @@ func Text() {
 	sets := Load()
 	const (
 		SampleSets = 1000
-		Samples    = SampleSets * 3
+		Samples    = SampleSets * 4
 	)
 	type Result struct {
 		Context int
@@ -193,16 +195,16 @@ func Text() {
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
-			for j := 0; j < 3; j++ {
+			for j := 0; j < 4; j++ {
 				query := model.Query.Sample(&rng)
 				key := model.Key.Sample(&rng)
 				value := model.Value.Sample(&rng)
 				order := model.Order.Sample(&rng)
-				samples[i*3+j].Query = query
-				samples[i*3+j].Key = key
-				samples[i*3+j].Value = value
-				samples[i*3+j].Order = order
-				samples[i*3+j].S = j
+				samples[i*4+j].Query = query
+				samples[i*4+j].Key = key
+				samples[i*4+j].Value = value
+				samples[i*4+j].Order = order
+				samples[i*4+j].S = j
 			}
 		}
 		done := make(chan bool, 8)
