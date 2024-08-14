@@ -98,36 +98,42 @@ func (p Problem) Size() int {
 }
 
 // GetSingleTrainingData gets the training data
-func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
+func (sets Sets) GetSingleTrainingData(tail []byte, s, t int) Problem {
 	if s == 0 {
 		set := sets[s]
+		txt := make([]byte, len(set.Text[2048:2048+512]))
+		copy(txt, set.Text[2048:2048+512])
+		txt = append(txt, tail...)
 		problem := Problem{
-			Input:  set.Text[2048 : 2048+512],
-			Output: set.Text[2048+512 : 2048+512+1],
+			Input:  txt,
+			Output: txt[511 : 511+1],
 			Count:  512 + 1,
 		}
 		problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 		index := 0
-		for i := 0; i < 512; i++ {
-			problem.Opt.Data[index+To[set.Text[i+2048]]] = 1
+		for i := 0; i < len(txt); i++ {
+			problem.Opt.Data[index+To[txt[i]]] = 1
 			index += Input
 		}
 		return problem
 	}
 	set := sets[s]
+	txt := make([]byte, len(set.Text))
+	copy(txt, set.Text)
+	txt = append(txt, tail...)
 	problem := Problem{
-		Input:  set.Text[:len(set.Text)-1],
-		Output: set.Text[len(set.Text)-1 : len(set.Text)],
-		Count:  len(set.Text),
+		Input:  txt[:len(txt)-1],
+		Output: txt[len(txt)-1:],
+		Count:  len(txt) + 1,
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	index := 0
-	for i := 0; i < len(set.Text); i++ {
-		if i < len(set.Text)-1 {
-			problem.Opt.Data[index+To[set.Text[i]]] = 1
+	for i := 0; i < len(txt)+1; i++ {
+		if i < len(txt) {
+			problem.Opt.Data[index+To[txt[i]]] = 1
 		}
-		if i > 0 {
-			problem.Opt.Data[index+To[set.Text[(i-1)]]] = 1
+		if i-1 > 0 {
+			problem.Opt.Data[index+To[txt[(i-1)]]] = 1
 		}
 		index += Input
 	}
@@ -176,7 +182,7 @@ func Text() {
 	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
 	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
 		depth--
-		opt := sets.GetSingleTrainingData(len(suffix), 1, 0)
+		opt := sets.GetSingleTrainingData(suffix, 1, 0)
 		model := Model{
 			Query: matrix.NewCompressedRandomMatrix(Input, Input),
 			Key:   matrix.NewCompressedRandomMatrix(Input, Input),
@@ -201,7 +207,7 @@ func Text() {
 		}
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opt := sets.GetSingleTrainingData(len(suffix), 1, 0)
+			opt := sets.GetSingleTrainingData(suffix, 1, 0)
 			sum := 0.0
 			order := sample.Order.Sample()
 			a, b := 0, 1
@@ -394,7 +400,7 @@ func Text() {
 			Score:   max,
 		}
 	}
-	opt := sets.GetSingleTrainingData(0, 1, 0)
+	opt := sets.GetSingleTrainingData([]byte{}, 1, 0)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	results := make(chan Result, Symbols)
