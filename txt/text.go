@@ -19,7 +19,7 @@ const (
 	// Symbols
 	Symbols = ('z' - 'a' + 1) + ('Z' - 'A' + 1) + 3
 	// Input is the network input size
-	Input = Symbols + 2*7
+	Input = 2*Symbols + 2*7
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 )
@@ -122,8 +122,13 @@ func (sets Sets) GetSingleTrainingData(tail, s, t int) Problem {
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	index := 0
-	for i := 0; i < len(set.Text)-1; i++ {
-		problem.Opt.Data[index+To[set.Text[i]]] = 1
+	for i := 0; i < len(set.Text); i++ {
+		if i < len(set.Text)-1 {
+			problem.Opt.Data[index+To[set.Text[i]]] = 1
+		}
+		if i > 0 {
+			problem.Opt.Data[index+To[set.Text[(i-1)]]] = 1
+		}
 		index += Input
 	}
 	return problem
@@ -202,8 +207,8 @@ func Text() {
 			a, b := 0, 1
 			for j := 0; j < opt.Opt.Rows; j++ {
 				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+				copy(opt.Opt.Data[j*Input+2*Symbols:j*Input+2*Symbols+7], order.Data[x*7:(x+1)*7])
+				copy(opt.Opt.Data[j*Input+2*Symbols+7:j*Input+2*Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 				a, b = b, a
 			}
 			index := 0
