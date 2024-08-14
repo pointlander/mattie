@@ -133,7 +133,7 @@ func (sets Sets) GetSingleTrainingData(tail []byte, s, t int) Problem {
 			problem.Opt.Data[index+To[txt[i]]] = 1
 		}
 		if i-1 > 0 {
-			problem.Opt.Data[index+To[txt[(i-1)]]] = 1
+			problem.Opt.Data[index+Symbols+To[txt[(i-1)]]] = 1
 		}
 		index += Input
 	}
@@ -216,11 +216,6 @@ func Text() {
 				copy(opt.Opt.Data[j*Input+2*Symbols:j*Input+2*Symbols+7], order.Data[x*7:(x+1)*7])
 				copy(opt.Opt.Data[j*Input+2*Symbols+7:j*Input+2*Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 				a, b = b, a
-			}
-			index := 0
-			for i := len(suffix) + 1; i > 1; i-- {
-				opt.Opt.Data[Input*(opt.Size()-i)+To[byte(suffix[index])]] = 1
-				index++
 			}
 			params := opt.Opt.Data[Input*(opt.Size()-1):]
 			params[To[byte(sample.S)]] = 1
