@@ -280,6 +280,21 @@ func Text() {
 			costs[i] = samples[i].Cost
 		}
 		spectrum := fft.FFTReal(costs)
+		cp := make([]complex128, len(spectrum))
+		copy(cp, spectrum)
+		filter := cp[len(cp)/2:]
+		for i := range filter {
+			filter[i] = 0
+		}
+		filtered := fft.IFFT(cp)
+		output, err := os.Create(fmt.Sprintf("spectrum_%d.txt", seed))
+		if err != nil {
+			panic(err)
+		}
+		defer output.Close()
+		for _, value := range filtered {
+			fmt.Fprintf(output, "%f\n", cmplx.Abs(value))
+		}
 		points := make(plotter.XYs, len(spectrum)-1)
 		spectrum = spectrum[1:]
 		for i := range spectrum {
