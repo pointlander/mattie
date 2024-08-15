@@ -179,8 +179,9 @@ type Stat struct {
 func Text() {
 	sets := Load()
 	const (
-		SampleSets = 2000
-		Samples    = SampleSets * 4
+		SetSize    = 32
+		SampleSets = 400
+		Samples    = SampleSets * SetSize
 	)
 	type Result struct {
 		Context int
@@ -197,20 +198,20 @@ func Text() {
 			Value: matrix.NewCompressedRandomMatrix(Input, Input),
 			Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
 		}
-		stats := make([]float64, Symbols)
+		stats := make([]float64, SetSize)
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
-			for j := 0; j < 4; j++ {
+			for j := 0; j < SetSize; j++ {
 				query := model.Query.Sample(&rng)
 				key := model.Key.Sample(&rng)
 				value := model.Value.Sample(&rng)
 				order := model.Order.Sample(&rng)
-				samples[i*4+j].Query = query
-				samples[i*4+j].Key = key
-				samples[i*4+j].Value = value
-				samples[i*4+j].Order = order
-				samples[i*4+j].S = j
+				samples[i*SetSize+j].Query = query
+				samples[i*SetSize+j].Key = key
+				samples[i*SetSize+j].Value = value
+				samples[i*SetSize+j].Order = order
+				samples[i*SetSize+j].S = j
 			}
 		}
 		done := make(chan bool, 8)
@@ -398,7 +399,7 @@ func Text() {
 		max, index := 0.0, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
-			for i := range stats /*[:16]*/ {
+			for i := range stats[:4] {
 				cp := make([]byte, len(suffix))
 				copy(cp, suffix)
 				s := append(cp, byte(i))
@@ -419,7 +420,7 @@ func Text() {
 				}
 			}
 		} else {
-			for i, stat := range stats /*[:16]*/ {
+			for i, stat := range stats[:4] {
 				if stat > max {
 					max, index = stat, i
 				}
