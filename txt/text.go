@@ -8,11 +8,17 @@ import (
 	"compress/bzip2"
 	"fmt"
 	"io"
+	"math/cmplx"
 	"os"
 	"runtime"
 	"sort"
 
+	"github.com/mjibson/go-dsp/fft"
 	"github.com/pointlander/matrix"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 )
 
 const (
@@ -267,6 +273,34 @@ func Text() {
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
 		})
+
+		costs := make([]float64, len(samples))
+		for i := range costs {
+			costs[i] = samples[i].Cost
+		}
+		spectrum := fft.FFTReal(costs)
+		points := make(plotter.XYs, len(spectrum)-1)
+		spectrum = spectrum[1:]
+		for i := range spectrum {
+			points[i] = plotter.XY{X: float64(i), Y: cmplx.Abs(spectrum[i])}
+		}
+
+		p := plot.New()
+		p.Title.Text = "spectrum"
+		p.X.Label.Text = "x"
+		p.Y.Label.Text = "y"
+		scatter, err := plotter.NewScatter(points)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("spectrum_%d.png", seed))
+		if err != nil {
+			panic(err)
+		}
+
 		/*avg, vr := 0.0, 0.0
 		for i := 0; i < len(samples); i++ {
 			avg += samples[i].Cost

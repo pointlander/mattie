@@ -10,6 +10,7 @@ require (
 	github.com/go-latex/latex v0.0.0-20230307184459-12ec69307ad9 // indirect
 	github.com/go-pdf/fpdf v0.8.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pointlander/matrix v0.0.0-20240807194641-c5b792d1f604 // indirect
 	golang.org/x/image v0.11.0 // indirect
