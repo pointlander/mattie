@@ -8,6 +8,7 @@ import (
 	"compress/bzip2"
 	"fmt"
 	"io"
+	"math"
 	"math/cmplx"
 	"os"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/mjibson/go-dsp/fft"
 	"github.com/pointlander/matrix"
+	"github.com/pointlander/matrix/vector"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -25,7 +27,7 @@ const (
 	// Symbols
 	Symbols = ('z' - 'a' + 1) + ('Z' - 'A' + 1) + 3
 	// Input is the network input size
-	Input = 2*Symbols + 2*7
+	Input = Symbols + 2*7
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 )
@@ -61,6 +63,54 @@ func init() {
 	To[byte(i)] = index
 	From[index] = byte(i)
 	index++
+}
+
+func softmax(values []float32) {
+	max := float32(0.0)
+	for _, v := range values {
+		if v > max {
+			max = v
+		}
+	}
+	s := max * S
+	sum := float32(0.0)
+	for j, value := range values {
+		values[j] = float32(math.Exp(float64(value - s)))
+		sum += values[j]
+	}
+	for j, value := range values {
+		values[j] = value / sum
+	}
+}
+
+// SelfEntropy computes the self entropy of Q, K, V
+func SelfEntropy(Q, K, V matrix.Matrix) []float32 {
+	entropies, values, results := make([]float32, V.Cols), make([]float32, K.Rows), make([]float32, 0, K.Rows)
+	V = V.T()
+	for i := 0; i < K.Rows; i++ {
+		K := K.Data[i*K.Cols : (i+1)*K.Cols]
+		for j := 0; j < Q.Rows; j++ {
+			if j < i {
+				continue
+			}
+			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
+			values[j] = vector.Dot(K, Q)
+		}
+		softmax(values)
+
+		for j := 0; j < V.Rows; j++ {
+			V := V.Data[j*V.Cols : (j+1)*V.Cols]
+			entropies[j] = vector.Dot(values, V)
+		}
+		softmax(entropies)
+
+		entropy := 0.0
+		for _, e := range entropies {
+			entropy += float64(e) * math.Log(float64(e))
+		}
+		results = append(results, float32(-entropy))
+	}
+	return results
 }
 
 // Set is a set of examples
@@ -138,11 +188,11 @@ func (sets Sets) GetSingleTrainingData(tail []byte, s, t int) Problem {
 		if i < len(txt) {
 			problem.Opt.Data[index+To[txt[i]]] = 1
 		}
-		if i-1 > 0 {
+		/*if i-1 > 0 {
 			problem.Opt.Data[index+Symbols+To[txt[(i-1)]]] = 1
 		} else {
 			problem.Opt.Data[index+Symbols+To[txt[(i)]]] = 1
-		}
+		}*/
 		index += Input
 	}
 	return problem
@@ -179,8 +229,8 @@ type Stat struct {
 func Text() {
 	sets := Load()
 	const (
-		SetSize    = 32
-		SampleSets = 400
+		SetSize    = 4
+		SampleSets = 1000
 		Samples    = SampleSets * SetSize
 	)
 	type Result struct {
@@ -222,8 +272,8 @@ func Text() {
 			a, b := 0, 1
 			for j := 0; j < opt.Opt.Rows; j++ {
 				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-				copy(opt.Opt.Data[j*Input+2*Symbols:j*Input+2*Symbols+7], order.Data[x*7:(x+1)*7])
-				copy(opt.Opt.Data[j*Input+2*Symbols+7:j*Input+2*Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 				a, b = b, a
 			}
 			params := opt.Opt.Data[Input*(opt.Size()-1):]
@@ -235,7 +285,7 @@ func Text() {
 			query := sample.Query.Sample()
 			key := sample.Key.Sample()
 			value := sample.Value.Sample()
-			entropy := matrix.SelfEntropy(
+			entropy := SelfEntropy(
 				query.MulT(opt.Opt),
 				key.MulT(opt.Opt),
 				value.MulT(opt.Opt))
@@ -450,14 +500,17 @@ func Text() {
 	opt := sets.GetSingleTrainingData([]byte{}, 1, 0)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
+	symbols := []byte{}
 	results := make(chan Result, Symbols)
-	search(0, 1, []byte{}, 1, results)
-	result := <-results
-	fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
-	symbols := []byte{byte(result.Symbol)}
+	for i := 1; i < 8; i++ {
+		search(0, uint32(i), []byte{}, 1, results)
+		result := <-results
+		fmt.Printf("%d %c %f\n", i, From[result.Symbol], result.Score)
+		symbols = []byte{byte(result.Symbol)}
+	}
 	for i := 0; i < 100; i++ {
 		search(0, uint32(i)+2, symbols, 1, results)
-		result = <-results
+		result := <-results
 		fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
 		symbols = append(symbols, byte(result.Symbol))
 	}
