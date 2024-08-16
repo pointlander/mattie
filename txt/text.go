@@ -90,9 +90,9 @@ func SelfEntropy(Q, K, V matrix.Matrix) []float32 {
 	for i := 0; i < K.Rows; i++ {
 		K := K.Data[i*K.Cols : (i+1)*K.Cols]
 		for j := 0; j < Q.Rows; j++ {
-			if j < i {
+			/*if j < i {
 				continue
-			}
+			}*/
 			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
 			values[j] = vector.Dot(K, Q)
 		}
@@ -532,14 +532,17 @@ func Text() {
 	fmt.Println(string(opt.Output))
 	symbols := []byte{}
 	results := make(chan Result, Symbols)
-	for i := 1; i < 8; i++ {
+	histogram := make([]int, 4)
+	for i := 1; i < 32; i++ {
 		search(0, uint32(i), []byte{}, 1, results)
 		result := <-results
 		fmt.Printf("%d %c %f\n", i, From[result.Symbol], result.Score)
 		symbols = []byte{byte(result.Symbol)}
+		histogram[result.Symbol]++
 	}
+	fmt.Println(histogram)
 	for i := 0; i < 100; i++ {
-		search(0, uint32(i)+8, symbols, 1, results)
+		search(0, uint32(i)+32, symbols, 1, results)
 		result := <-results
 		fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
 		symbols = append(symbols, byte(result.Symbol))
