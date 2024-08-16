@@ -225,6 +225,30 @@ type Stat struct {
 	SumSquared float64
 }
 
+// Filtered is a filterd sample
+type Filtered struct {
+	Sample   *Sample
+	Filtered complex128
+}
+
+// FilteredSet is a filtered sample set
+type FilteredSet []Filtered
+
+// Len is the length of the filtered set
+func (f FilteredSet) Len() int {
+	return len(f)
+}
+
+// Less determines if one member of the set is less than the other
+func (f FilteredSet) Less(i, j int) bool {
+	return cmplx.Abs(f[i].Filtered) < cmplx.Abs(f[j].Filtered)
+}
+
+// Swap swaps two set members
+func (f FilteredSet) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+
 // Text mode
 func Text() {
 	sets := Load()
@@ -332,11 +356,17 @@ func Text() {
 		spectrum := fft.FFTReal(costs)
 		cp := make([]complex128, len(spectrum))
 		copy(cp, spectrum)
-		filter := cp[len(cp)/2:]
+		filter := cp[:len(cp)/2]
 		for i := range filter {
 			filter[i] = 0
 		}
 		filtered := fft.IFFT(cp)
+		fs := make(FilteredSet, len(filtered))
+		for key, value := range filtered {
+			fs[key].Sample = &samples[key]
+			fs[key].Filtered = value
+		}
+		sort.Sort(fs)
 		output, err := os.Create(fmt.Sprintf("spectrum_%d.txt", seed))
 		if err != nil {
 			panic(err)
@@ -436,8 +466,8 @@ func Text() {
 
 		acc := [Symbols]int{}
 		factor := [Symbols]int{}
-		for sample := range samples {
-			index := samples[sample].S
+		for sample := range fs {
+			index := fs[sample].Sample.S
 			acc[index]++
 			scale := sample - factor[index]
 			factor[index] = sample
@@ -509,7 +539,7 @@ func Text() {
 		symbols = []byte{byte(result.Symbol)}
 	}
 	for i := 0; i < 100; i++ {
-		search(0, uint32(i)+2, symbols, 1, results)
+		search(0, uint32(i)+8, symbols, 1, results)
 		result := <-results
 		fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
 		symbols = append(symbols, byte(result.Symbol))
