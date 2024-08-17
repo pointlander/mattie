@@ -25,6 +25,8 @@ var (
 	FlagText2 = flag.Bool("text2", false, "text 2 mode")
 	// Txt is actual text mode
 	FlagTxt = flag.Bool("txt", false, "true txt mode")
+	// FlagFull computes the full string
+	FlagFull = flag.Bool("full", false, "compute the full string")
 )
 
 func main() {
@@ -43,7 +45,7 @@ func main() {
 		text2.Text2()
 		return
 	} else if *FlagTxt {
-		txt.Text()
+		txt.Text(*FlagFull)
 		return
 	}
 }

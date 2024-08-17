@@ -250,7 +250,7 @@ func (f FilteredSet) Swap(i, j int) {
 }
 
 // Text mode
-func Text() {
+func Text(full bool) {
 	os.Mkdir("output", 0755)
 	sets := Load()
 	const (
@@ -540,19 +540,49 @@ func Text() {
 	fmt.Println(string(opt.Output))
 	symbols := []byte{}
 	results := make(chan Result, Symbols)
+	set := make([]Result, 0, 8)
 	histogram := make([]int, 4)
-	for i := 1; i < 16; i++ {
+	for i := 1; i < 128; i++ {
 		search(0, uint32(i), []byte{}, 1, results)
 		result := <-results
 		fmt.Printf("%d %c %f\n", i, From[result.Symbol], result.Score)
 		symbols = []byte{byte(result.Symbol)}
 		histogram[result.Symbol]++
+		set = append(set, result)
 	}
+	sort.Slice(set, func(i, j int) bool {
+		return set[i].Score < set[j].Score
+	})
 	fmt.Println("histogram", histogram)
-	for i := 0; i < 100; i++ {
-		search(0, uint32(i)+16, symbols, 1, results)
-		result := <-results
-		fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
-		symbols = append(symbols, byte(result.Symbol))
+	for _, value := range set {
+		fmt.Printf("%c %f\n", From[value.Symbol], value.Score)
+	}
+	stats := make([]float64, SetSize)
+	acc := [Symbols]int{}
+	factor := [Symbols]int{}
+	for sample := range set {
+		index := set[sample].Symbol
+		acc[index]++
+		scale := sample - factor[index]
+		factor[index] = sample
+		if scale == 0 {
+			scale = 1
+		}
+		max, sym := 0.0, 0
+		for key, value := range acc {
+			if float64(value) > max {
+				max, sym = float64(value), key
+			}
+		}
+		stats[sym] += 1 / float64(scale)
+	}
+	fmt.Println(stats)
+	if full {
+		for i := 0; i < 100; i++ {
+			search(0, uint32(i)+16, symbols, 1, results)
+			result := <-results
+			fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
+			symbols = append(symbols, byte(result.Symbol))
+		}
 	}
 }
