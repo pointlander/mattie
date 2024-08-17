@@ -14,13 +14,8 @@ import (
 	"runtime"
 	"sort"
 
-	"github.com/mjibson/go-dsp/fft"
 	"github.com/pointlander/matrix"
 	"github.com/pointlander/matrix/vector"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
-	"gonum.org/v1/plot/vg/draw"
 )
 
 const (
@@ -357,7 +352,7 @@ func Text(full bool) {
 			return samples[i].Cost < samples[j].Cost
 		})
 
-		costs := make([]float64, len(samples))
+		/*costs := make([]float64, len(samples))
 		for i := range costs {
 			costs[i] = samples[i].Cost
 		}
@@ -403,7 +398,7 @@ func Text(full bool) {
 		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("output/spectrum_%d.png", seed))
 		if err != nil {
 			panic(err)
-		}
+		}*/
 
 		/*avg, vr := 0.0, 0.0
 		for i := 0; i < len(samples); i++ {
