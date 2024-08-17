@@ -131,7 +131,7 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcdabc")
+	sets[1].Text = []byte("abcdabcdabcdab....c")
 	return sets
 }
 
@@ -250,7 +250,7 @@ func Text(full bool) {
 	sets := Load()
 	const (
 		SetSize    = 4
-		SampleSets = 1000
+		SampleSets = 100
 		Samples    = SampleSets * SetSize
 	)
 	type Result struct {
