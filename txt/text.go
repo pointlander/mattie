@@ -131,7 +131,7 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcdabcd")
+	sets[1].Text = []byte("abcdabcdabcdabc")
 	return sets
 }
 
@@ -467,11 +467,14 @@ func Text(full bool) {
 			}
 		}*/
 
-		factor := [Symbols]int{}
+		factor := [Symbols]float64{}
 		for sample := range samples {
 			index := samples[sample].S
-			scale := sample - factor[index]
-			factor[index] = sample
+			scale := samples[sample].Cost - factor[index]
+			if scale < 0 {
+				scale = -scale
+			}
+			factor[index] = samples[sample].Cost
 			if scale == 0 {
 				scale = 1
 			}
@@ -545,11 +548,14 @@ func Text(full bool) {
 		fmt.Printf("%c %f\n", From[value.Symbol], value.Score)
 	}
 	stats := make([]float64, SetSize)
-	factor := [Symbols]int{}
+	factor := [Symbols]float64{}
 	for sample := range set {
 		index := set[sample].Symbol
-		scale := sample - factor[index]
-		factor[index] = sample
+		scale := set[sample].Score - factor[index]
+		if scale < 0 {
+			scale = -scale
+		}
+		factor[index] = set[sample].Score
 		if scale == 0 {
 			scale = 1
 		}
