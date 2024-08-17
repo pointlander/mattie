@@ -472,23 +472,15 @@ func Text(full bool) {
 			}
 		}*/
 
-		acc := [Symbols]int{}
 		factor := [Symbols]int{}
-		for sample := range fs {
-			index := fs[sample].Sample.S
-			acc[index]++
+		for sample := range samples {
+			index := samples[sample].S
 			scale := sample - factor[index]
 			factor[index] = sample
 			if scale == 0 {
 				scale = 1
 			}
-			max, sym := 0.0, 0
-			for key, value := range acc {
-				if float64(value) > max {
-					max, sym = float64(value), key
-				}
-			}
-			stats[sym] += 1 / float64(scale)
+			stats[index] += 1 / float64(scale)
 		}
 		/*vr = math.Sqrt(vr)
 		for sample := range samples {
@@ -558,23 +550,15 @@ func Text(full bool) {
 		fmt.Printf("%c %f\n", From[value.Symbol], value.Score)
 	}
 	stats := make([]float64, SetSize)
-	acc := [Symbols]int{}
 	factor := [Symbols]int{}
 	for sample := range set {
 		index := set[sample].Symbol
-		acc[index]++
 		scale := sample - factor[index]
 		factor[index] = sample
 		if scale == 0 {
 			scale = 1
 		}
-		max, sym := 0.0, 0
-		for key, value := range acc {
-			if float64(value) > max {
-				max, sym = float64(value), key
-			}
-		}
-		stats[sym] += 1 / float64(scale)
+		stats[index] += 1 / float64(scale)
 	}
 	fmt.Println(stats)
 	if full {
