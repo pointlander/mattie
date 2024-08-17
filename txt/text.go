@@ -251,6 +251,7 @@ func (f FilteredSet) Swap(i, j int) {
 
 // Text mode
 func Text() {
+	os.Mkdir("output", 0755)
 	sets := Load()
 	const (
 		SetSize    = 4
@@ -294,12 +295,19 @@ func Text() {
 			sum := 0.0
 			order := sample.Order.Sample()
 			a, b := 0, 1
-			for j := 0; j < opt.Opt.Rows; j++ {
+			jj := opt.Opt.Rows //- 1
+			for j := 0; j < jj; j++ {
 				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
 				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
 				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 				a, b = b, a
 			}
+			/*if x := jj + a; x < opt.Opt.Rows {
+				copy(opt.Opt.Data[jj*Input+Symbols:jj*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+			}
+			if y := jj + b; y < opt.Opt.Rows {
+				copy(opt.Opt.Data[jj*Input+Symbols+7:jj*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+			}*/
 			params := opt.Opt.Data[Input*(opt.Size()-1):]
 			params[To[byte(sample.S)]] = 1
 			/*out := matrix.SelfAttention(
@@ -367,7 +375,7 @@ func Text() {
 			fs[key].Filtered = value
 		}
 		sort.Sort(fs)
-		output, err := os.Create(fmt.Sprintf("spectrum_%d.txt", seed))
+		output, err := os.Create(fmt.Sprintf("output/spectrum_%d.txt", seed))
 		if err != nil {
 			panic(err)
 		}
@@ -392,7 +400,7 @@ func Text() {
 		scatter.GlyphStyle.Radius = vg.Length(1)
 		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
 		p.Add(scatter)
-		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("spectrum_%d.png", seed))
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("output/spectrum_%d.png", seed))
 		if err != nil {
 			panic(err)
 		}
@@ -533,16 +541,16 @@ func Text() {
 	symbols := []byte{}
 	results := make(chan Result, Symbols)
 	histogram := make([]int, 4)
-	for i := 1; i < 32; i++ {
+	for i := 1; i < 16; i++ {
 		search(0, uint32(i), []byte{}, 1, results)
 		result := <-results
 		fmt.Printf("%d %c %f\n", i, From[result.Symbol], result.Score)
 		symbols = []byte{byte(result.Symbol)}
 		histogram[result.Symbol]++
 	}
-	fmt.Println(histogram)
+	fmt.Println("histogram", histogram)
 	for i := 0; i < 100; i++ {
-		search(0, uint32(i)+32, symbols, 1, results)
+		search(0, uint32(i)+16, symbols, 1, results)
 		result := <-results
 		fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
 		symbols = append(symbols, byte(result.Symbol))
