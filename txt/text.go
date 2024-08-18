@@ -118,7 +118,7 @@ type Sets []Set
 
 // Load load text data
 func Load() Sets {
-	sets := make(Sets, 2)
+	sets := make(Sets, 5)
 	input, err := os.Open("1513.txt.utf-8.bz2")
 	if err != nil {
 		panic(err)
@@ -131,7 +131,10 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcdab....c")
+	sets[1].Text = []byte("abcdabcdabcd....a")
+	sets[2].Text = []byte("abcdabcdabcda....b")
+	sets[3].Text = []byte("abcdabcdabcdab....c")
+	sets[4].Text = []byte("abcdabcdabcdabc....d")
 	return sets
 }
 
@@ -245,7 +248,7 @@ func (f FilteredSet) Swap(i, j int) {
 }
 
 // Text mode
-func Text(full bool) {
+func Text(full bool, s int) int {
 	os.Mkdir("output", 0755)
 	sets := Load()
 	const (
@@ -261,7 +264,7 @@ func Text(full bool) {
 	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
 	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
 		depth--
-		opt := sets.GetSingleTrainingData(suffix, 1, 0)
+		opt := sets.GetSingleTrainingData(suffix, s, 0)
 		model := Model{
 			Query: matrix.NewCompressedRandomMatrix(Input, Input),
 			Key:   matrix.NewCompressedRandomMatrix(Input, Input),
@@ -286,7 +289,7 @@ func Text(full bool) {
 		}
 		done := make(chan bool, 8)
 		process := func(sample *Sample) {
-			opt := sets.GetSingleTrainingData(suffix, 1, 0)
+			opt := sets.GetSingleTrainingData(suffix, s, 0)
 			sum := 0.0
 			order := sample.Order.Sample()
 			a, b := 0, 1
@@ -525,7 +528,7 @@ func Text(full bool) {
 			Score:   max,
 		}
 	}
-	opt := sets.GetSingleTrainingData([]byte{}, 1, 0)
+	opt := sets.GetSingleTrainingData([]byte{}, s, 0)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	symbols := []byte{}
@@ -569,5 +572,14 @@ func Text(full bool) {
 			fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
 			symbols = append(symbols, byte(result.Symbol))
 		}
+	} else {
+		max, sym := 0.0, 0
+		for key, value := range stats {
+			if value > max {
+				max, sym = value, key
+			}
+		}
+		return sym + 1
 	}
+	return 0
 }
