@@ -131,10 +131,10 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcd....a")
-	sets[2].Text = []byte("abcdabcdabcda....b")
-	sets[3].Text = []byte("abcdabcdabcdab....c")
-	sets[4].Text = []byte("abcdabcdabcdabc....d")
+	sets[1].Text = []byte("abcdabcdabcda")
+	sets[2].Text = []byte("abcdabcdabcdab")
+	sets[3].Text = []byte("abcdabcdabcdabc")
+	sets[4].Text = []byte("abcdabcdabcdabcdabcdabcd")
 	return sets
 }
 
@@ -182,10 +182,8 @@ func (sets Sets) GetSingleTrainingData(tail []byte, s, t int) Problem {
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	index := 0
-	for i := 0; i < len(txt)+1; i++ {
-		if i < len(txt) {
-			problem.Opt.Data[index+To[txt[i]]] = 1
-		}
+	for i := 0; i < len(txt)-1; i++ {
+		problem.Opt.Data[index+To[txt[i]]] = 1
 		/*if i-1 > 0 {
 			problem.Opt.Data[index+Symbols+To[txt[(i-1)]]] = 1
 		} else {
@@ -194,7 +192,6 @@ func (sets Sets) GetSingleTrainingData(tail []byte, s, t int) Problem {
 		index += Input
 	}
 	return problem
-
 }
 
 // Model model is the random matrix model
@@ -307,7 +304,7 @@ func Text(full bool, s int) int {
 				copy(opt.Opt.Data[jj*Input+Symbols+7:jj*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
 			}*/
 			params := opt.Opt.Data[Input*(opt.Size()-1):]
-			params[To[byte(sample.S)]] = 1
+			params[sample.S] = 1
 			/*out := matrix.SelfAttention(
 			sample.Query.MulT(opt.Opt),
 			sample.Key.MulT(opt.Opt),
@@ -535,7 +532,7 @@ func Text(full bool, s int) int {
 	results := make(chan Result, Symbols)
 	set := make([]Result, 0, 8)
 	histogram := make([]int, 4)
-	for i := 1; i < 128; i++ {
+	for i := 1; i < 64; i++ {
 		search(0, uint32(i), []byte{}, 1, results)
 		result := <-results
 		fmt.Printf("%d %c %f\n", i, From[result.Symbol], result.Score)
