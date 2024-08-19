@@ -479,7 +479,7 @@ func Text(full bool, s int) int {
 			}
 			factor[index] = samples[sample].Cost
 			if scale == 0 {
-				scale = 1
+				continue
 			}
 			stats[index] += 1 / float64(scale)
 		}
@@ -560,7 +560,7 @@ func Text(full bool, s int) int {
 		}
 		factor[index] = set[sample].Score
 		if scale == 0 {
-			scale = 1
+			continue
 		}
 		stats[index] += 1 / float64(scale)
 	}
