@@ -18,3 +18,10 @@ func TestText(t *testing.T) {
 		}
 	}
 }
+
+func TestText2(t *testing.T) {
+	result := txt.Text(false, 5)
+	if result != 4 {
+		t.Fatalf("fail 4!=%d", result)
+	}
+}

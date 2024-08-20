@@ -118,7 +118,7 @@ type Sets []Set
 
 // Load load text data
 func Load() Sets {
-	sets := make(Sets, 5)
+	sets := make(Sets, 6)
 	input, err := os.Open("1513.txt.utf-8.bz2")
 	if err != nil {
 		panic(err)
@@ -135,6 +135,7 @@ func Load() Sets {
 	sets[2].Text = []byte("abcdabcdabcdab")
 	sets[3].Text = []byte("abcdabcdabcdabcdabc")
 	sets[4].Text = []byte("abcdabcdabcdabcdabc....d")
+	sets[5].Text = []byte("abcddcbaabcddcbaabc....d")
 	return sets
 }
 
