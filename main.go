@@ -45,7 +45,7 @@ func main() {
 		text2.Text2()
 		return
 	} else if *FlagTxt {
-		txt.Text(*FlagFull, 5)
+		txt.Text(*FlagFull, 1)
 		return
 	}
 }

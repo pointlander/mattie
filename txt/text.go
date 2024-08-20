@@ -16,6 +16,8 @@ import (
 
 	"github.com/pointlander/matrix"
 	"github.com/pointlander/matrix/vector"
+
+	"github.com/alixaxel/pagerank"
 )
 
 const (
@@ -106,6 +108,26 @@ func SelfEntropy(Q, K, V matrix.Matrix) []float32 {
 		results = append(results, float32(-entropy))
 	}
 	return results
+}
+
+// PageRank computes the page rank of Q, K
+func PageRank(Q, K matrix.Matrix) float64 {
+	graph := pagerank.NewGraph()
+	for i := 0; i < K.Rows; i++ {
+		K := K.Data[i*K.Cols : (i+1)*K.Cols]
+		for j := 0; j < Q.Rows; j++ {
+			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
+			d := float64(vector.Dot(K, Q))
+			graph.Link(uint32(i), uint32(j), d*d)
+		}
+	}
+	result := 0.0
+	graph.Rank(0.85, 0.000001, func(node uint32, rank float64) {
+		if node == uint32(K.Rows-1) {
+			result = rank
+		}
+	})
+	return result
 }
 
 // Set is a set of examples
@@ -308,16 +330,17 @@ func Text(full bool, s int) int {
 			params[sample.S] = 1
 			query := sample.Query.Sample()
 			key := sample.Key.Sample()
-			value := sample.Value.Sample()
-			out := matrix.SelfAttention(
-				query.MulT(opt.Opt),
-				key.MulT(opt.Opt),
-				value.MulT(opt.Opt))
+			//value := sample.Value.Sample()
+			q := query.MulT(opt.Opt)
+			k := key.MulT(opt.Opt)
+			/*v := value.MulT(opt.Opt)
+			out := matrix.SelfAttention(q, k, v)*/
+			result := PageRank(q, k)
 			/*entropy := SelfEntropy(
 			query.MulT(opt.Opt),
 			key.MulT(opt.Opt),
 			value.MulT(opt.Opt))*/
-			for i := 0; i < out.Rows; i++ {
+			/*for i := 0; i < out.Rows; i++ {
 				for j := i + 1; j < out.Rows; j++ {
 					distance := 0.0
 					for k := 0; k < out.Cols; k++ {
@@ -326,7 +349,7 @@ func Text(full bool, s int) int {
 					}
 					sum += math.Sqrt(distance)
 				}
-			}
+			}*/
 			/*for _, value := range entropy {
 				sum += float64(value)
 			}*/
@@ -336,7 +359,8 @@ func Text(full bool, s int) int {
 					sum += float64(diff*diff)
 				}
 			}*/
-			sample.Cost = sum
+			_ = sum
+			sample.Cost = result
 			done <- true
 		}
 		flight, index, cpus := 0, 0, runtime.NumCPU()
@@ -491,6 +515,7 @@ func Text(full bool, s int) int {
 			}
 			stats[index] += 1 / float64(scale)
 		}
+
 		/*vr = math.Sqrt(vr)
 		for sample := range samples {
 			x := samples[sample].Cost
