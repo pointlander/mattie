@@ -133,8 +133,8 @@ func Load() Sets {
 
 	sets[1].Text = []byte("abcdabcdabcda")
 	sets[2].Text = []byte("abcdabcdabcdab")
-	sets[3].Text = []byte("abcdabcdabcdabc")
-	sets[4].Text = []byte("abcdabcdabc....d")
+	sets[3].Text = []byte("abcdabcdabcdabcdabc")
+	sets[4].Text = []byte("abcdabcdabcdabcdabc....d")
 	return sets
 }
 
@@ -205,13 +205,12 @@ type Model struct {
 
 // Sample is a sample
 type Sample struct {
-	Query  matrix.CompressedGenerator
-	Key    matrix.CompressedGenerator
-	Value  matrix.CompressedGenerator
-	S      int
-	Order  matrix.CompressedGenerator
-	Cost   float64
-	Vector int
+	Query matrix.CompressedGenerator
+	Key   matrix.CompressedGenerator
+	Value matrix.CompressedGenerator
+	S     int
+	Order matrix.CompressedGenerator
+	Cost  float64
 }
 
 // Stat is a statistic
@@ -313,14 +312,12 @@ func Text(full bool, s int) int {
 				query.MulT(opt.Opt),
 				key.MulT(opt.Opt),
 				value.MulT(opt.Opt))
-			entropy := SelfEntropy(
-				query.MulT(opt.Opt),
-				key.MulT(opt.Opt),
-				value.MulT(opt.Opt))
-			min, vector := math.MaxFloat64, 0
+			/*entropy := SelfEntropy(
+			query.MulT(opt.Opt),
+			key.MulT(opt.Opt),
+			value.MulT(opt.Opt))*/
 			for i := 0; i < out.Rows; i++ {
-				sum := 0.0
-				for j := 0; j < out.Rows; j++ {
+				for j := i + 1; j < out.Rows; j++ {
 					distance := 0.0
 					for k := 0; k < out.Cols; k++ {
 						diff := float64(out.Data[i*out.Cols+k] - out.Data[j*out.Cols+k])
@@ -328,13 +325,10 @@ func Text(full bool, s int) int {
 					}
 					sum += math.Sqrt(distance)
 				}
-				if sum < min {
-					min, vector = sum, i
-				}
 			}
-			for _, value := range entropy {
+			/*for _, value := range entropy {
 				sum += float64(value)
-			}
+			}*/
 			/*for j := 0; j < out.Rows; j++ {
 				for k := 0; k < out.Cols; k++ {
 					diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
@@ -342,7 +336,6 @@ func Text(full bool, s int) int {
 				}
 			}*/
 			sample.Cost = sum
-			sample.Vector = vector
 			done <- true
 		}
 		flight, index, cpus := 0, 0, runtime.NumCPU()
@@ -364,12 +357,6 @@ func Text(full bool, s int) int {
 		for i := 0; i < flight; i++ {
 			<-done
 		}
-
-		hist := make([]int, opt.Size())
-		for _, s := range samples {
-			hist[s.Vector]++
-		}
-		fmt.Println(hist)
 
 		sort.Slice(samples, func(i, j int) bool {
 			return samples[i].Cost < samples[j].Cost
