@@ -545,7 +545,7 @@ func Text(full bool, s int) int {
 		}*/
 		fmt.Println(stddev)
 
-		min, index := math.MaxFloat64, 0
+		max, index := 0.0, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
 			for i := range stddev[:4] {
@@ -560,8 +560,8 @@ func Text(full bool, s int) int {
 			}
 			count := 0
 			for result := range results {
-				if score := result.Score + stddev[result.Context]; score < min {
-					min, index = score, result.Context
+				if score := result.Score + stddev[result.Context]; score > max {
+					max, index = score, result.Context
 				}
 				count++
 				if count == Symbols {
@@ -569,9 +569,10 @@ func Text(full bool, s int) int {
 				}
 			}
 		} else {
-			for i, stat := range stddev[:4] {
-				if stat < min {
-					min, index = stat, i
+			for i, stat := range avg[:4] {
+				stat /= stddev[i]
+				if stat > max {
+					max, index = stat, i
 				}
 			}
 		}
@@ -641,6 +642,11 @@ func Text(full bool, s int) int {
 	}
 	fmt.Println(avg)
 	fmt.Println(stddev)
+	metric := [SetSize]float64{}
+	for i, v := range avg {
+		metric[i] = v / stddev[i]
+	}
+	fmt.Println(metric)
 	if full {
 		for i := 0; i < 100; i++ {
 			search(0, uint32(i)+16, symbols, 1, results)
@@ -649,10 +655,11 @@ func Text(full bool, s int) int {
 			symbols = append(symbols, byte(result.Symbol))
 		}
 	} else {
-		min, sym := math.MaxFloat64, 0
-		for key, value := range stddev {
-			if value < min {
-				min, sym = value, key
+		max, sym := 0.0, 0
+		for key, value := range avg {
+			value /= stddev[key]
+			if value > max {
+				max, sym = value, key
 			}
 		}
 		return sym + 1
