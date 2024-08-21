@@ -153,11 +153,11 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcda")
-	sets[2].Text = []byte("abcdabcdabcdab")
+	sets[1].Text = []byte("abcdabcdabcdabcda")
+	sets[2].Text = []byte("abcdabcdabcdabcdab")
 	sets[3].Text = []byte("abcdabcdabcdabcdabc")
-	sets[4].Text = []byte("abcdabcdabcdabcdabc....d")
-	sets[5].Text = []byte("abcddcbaabcddcbaabc....d")
+	sets[4].Text = []byte("abcdabcdabcdabcdabcd")
+	sets[5].Text = []byte("abcddcbaabcddcbaabcd")
 	return sets
 }
 
@@ -280,6 +280,7 @@ func Text(full bool, s int) int {
 		Context int
 		Symbol  int
 		Score   float64
+		Samples []Sample
 	}
 	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
 	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
@@ -291,7 +292,7 @@ func Text(full bool, s int) int {
 			Value: matrix.NewCompressedRandomMatrix(Input, Input),
 			Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
 		}
-		stats := make([]float64, SetSize)
+		//stats := make([]float64, SetSize)
 		samples := make([]Sample, Samples)
 		rng := matrix.Rand(seed)
 		for i := 0; i < SampleSets; i++ {
@@ -502,7 +503,7 @@ func Text(full bool, s int) int {
 			}
 		}*/
 
-		factor := [Symbols]float64{}
+		/*factor := [Symbols]float64{}
 		for sample := range samples {
 			index := samples[sample].S
 			scale := samples[sample].Cost - factor[index]
@@ -514,8 +515,27 @@ func Text(full bool, s int) int {
 				continue
 			}
 			stats[index] += 1 / float64(scale)
-		}
+		}*/
 
+		avg := [SetSize]float64{}
+		count := [SetSize]float64{}
+		for sample := range samples {
+			index := samples[sample].S
+			avg[index] += samples[sample].Cost
+			count[index]++
+		}
+		for i := range avg {
+			avg[i] /= count[i]
+		}
+		stddev := [SetSize]float64{}
+		for sample := range samples {
+			index := samples[sample].S
+			diff := avg[index] - samples[sample].Cost
+			stddev[index] += diff * diff
+		}
+		for i, v := range stddev {
+			stddev[i] = math.Sqrt(v)
+		}
 		/*vr = math.Sqrt(vr)
 		for sample := range samples {
 			x := samples[sample].Cost
@@ -523,12 +543,12 @@ func Text(full bool, s int) int {
 			index := samples[sample].S
 			stats[index] += 1 / g
 		}*/
-		fmt.Println(stats)
+		fmt.Println(stddev)
 
-		max, index := 0.0, 0
+		min, index := math.MaxFloat64, 0
 		if depth > 0 {
 			results := make(chan Result, Symbols)
-			for i := range stats[:4] {
+			for i := range stddev[:4] {
 				cp := make([]byte, len(suffix))
 				copy(cp, suffix)
 				s := append(cp, byte(i))
@@ -540,8 +560,8 @@ func Text(full bool, s int) int {
 			}
 			count := 0
 			for result := range results {
-				if score := result.Score + stats[result.Context]; score > max {
-					max, index = score, result.Context
+				if score := result.Score + stddev[result.Context]; score < min {
+					min, index = score, result.Context
 				}
 				count++
 				if count == Symbols {
@@ -549,16 +569,17 @@ func Text(full bool, s int) int {
 				}
 			}
 		} else {
-			for i, stat := range stats[:4] {
-				if stat > max {
-					max, index = stat, i
+			for i, stat := range stddev[:4] {
+				if stat < min {
+					min, index = stat, i
 				}
 			}
 		}
 		results <- Result{
 			Context: context,
 			Symbol:  index,
-			Score:   max,
+			Score:   avg[index],
+			Samples: samples,
 		}
 	}
 	opt := sets.GetSingleTrainingData([]byte{}, s, 0)
@@ -568,6 +589,7 @@ func Text(full bool, s int) int {
 	results := make(chan Result, Symbols)
 	set := make([]Result, 0, 8)
 	histogram := make([]int, 4)
+	samples := []Sample{}
 	for i := 1; i < 64; i++ {
 		search(0, uint32(i), []byte{}, 1, results)
 		result := <-results
@@ -575,6 +597,7 @@ func Text(full bool, s int) int {
 		symbols = []byte{byte(result.Symbol)}
 		histogram[result.Symbol]++
 		set = append(set, result)
+		samples = append(samples, result.Samples...)
 	}
 	sort.Slice(set, func(i, j int) bool {
 		return set[i].Score < set[j].Score
@@ -583,7 +606,7 @@ func Text(full bool, s int) int {
 	for _, value := range set {
 		fmt.Printf("%c %f\n", From[value.Symbol], value.Score)
 	}
-	stats := make([]float64, SetSize)
+	/*stats := make([]float64, SetSize)
 	factor := [Symbols]float64{}
 	for sample := range set {
 		index := set[sample].Symbol
@@ -596,8 +619,28 @@ func Text(full bool, s int) int {
 			continue
 		}
 		stats[index] += 1 / float64(scale)
+	}*/
+	avg := [SetSize]float64{}
+	count := [SetSize]float64{}
+	for sample := range samples {
+		index := samples[sample].S
+		avg[index] += samples[sample].Cost
+		count[index]++
 	}
-	fmt.Println(stats)
+	for i := range avg {
+		avg[i] /= count[i]
+	}
+	stddev := [SetSize]float64{}
+	for sample := range samples {
+		index := samples[sample].S
+		diff := avg[index] - samples[sample].Cost
+		stddev[index] += diff * diff
+	}
+	for i, v := range stddev {
+		stddev[i] = math.Sqrt(v)
+	}
+	fmt.Println(avg)
+	fmt.Println(stddev)
 	if full {
 		for i := 0; i < 100; i++ {
 			search(0, uint32(i)+16, symbols, 1, results)
@@ -606,10 +649,10 @@ func Text(full bool, s int) int {
 			symbols = append(symbols, byte(result.Symbol))
 		}
 	} else {
-		max, sym := 0.0, 0
-		for key, value := range stats {
-			if value > max {
-				max, sym = value, key
+		min, sym := math.MaxFloat64, 0
+		for key, value := range stddev {
+			if value < min {
+				min, sym = value, key
 			}
 		}
 		return sym + 1
