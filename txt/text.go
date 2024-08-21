@@ -122,7 +122,7 @@ func PageRank(Q, K matrix.Matrix) float64 {
 		}
 	}
 	result := 0.0
-	graph.Rank(0.85, 0.000001, func(node uint32, rank float64) {
+	graph.Rank(0.85, 1e-6, func(node uint32, rank float64) {
 		if node == uint32(K.Rows-1) {
 			result = rank
 		}
@@ -154,8 +154,8 @@ func Load() Sets {
 	sets[0].Text = data
 
 	sets[1].Text = []byte("abcdabcdabcdabcda")
-	sets[2].Text = []byte("abcdabcdabcdabcdab")
-	sets[3].Text = []byte("abcdabcdabcdabcdabc")
+	sets[2].Text = []byte("abcdabcdabcdabcdabc")
+	sets[3].Text = []byte("abcdabcdabcdabcdab")
 	sets[4].Text = []byte("abcdabcdabcdabcdabcd")
 	sets[5].Text = []byte("abcddcbaabcddcbaabcd")
 	return sets
