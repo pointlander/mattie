@@ -21,8 +21,10 @@ import (
 const (
 	// Symbols
 	Symbols = ('z' - 'a' + 1) + ('Z' - 'A' + 1) + 3
+	// Size is the link size
+	Size = 4
 	// Input is the network input size
-	Input = Symbols + 2*7
+	Input = Symbols + 2*Size
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// SetSize is the size of a symbol set
@@ -110,8 +112,8 @@ func Load() Sets {
 	sets[0].Text = data
 
 	sets[1].Text = []byte("abcdabcdabcdabcda")
-	sets[2].Text = []byte("abcdabcdabcdabcdabc")
-	sets[3].Text = []byte("abcdabcdabcdabcdab")
+	sets[2].Text = []byte("abcdabcdabcdabcdab")
+	sets[3].Text = []byte("abcdabcdabcdabcdabc")
 	sets[4].Text = []byte("abcdabcdabcdabcdabcd")
 	sets[5].Text = []byte("abcddcbaabcddcbaabcd")
 	return sets
@@ -188,7 +190,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	model := Model{
 		Query: matrix.NewCompressedRandomMatrix(Input, Input),
 		Key:   matrix.NewCompressedRandomMatrix(Input, Input),
-		Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
+		Order: matrix.NewCompressedRandomMatrix(Size, opt.Size()),
 	}
 	samples := make([]Sample, Samples)
 	rng := matrix.Rand(seed)
@@ -196,7 +198,6 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		for j := 0; j < SetSize; j++ {
 			query := model.Query.Sample(&rng)
 			key := model.Key.Sample(&rng)
-			rng.Uint32()
 			order := model.Order.Sample(&rng)
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
@@ -211,8 +212,8 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		a, b := 0, 1
 		for j := 0; j < opt.Opt.Rows; j++ {
 			x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-			copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-			copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+			copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+Size], order.Data[x*Size:(x+1)*Size])
+			copy(opt.Opt.Data[j*Input+Symbols+Size:j*Input+Symbols+2*Size], order.Data[(y)*Size:(y+1)*Size])
 			a, b = b, a
 		}
 		params := opt.Opt.Data[Input*(opt.Size()-1):]
