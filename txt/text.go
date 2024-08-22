@@ -81,7 +81,7 @@ func PageRank(Q, K matrix.Matrix) float64 {
 	}
 	result := 0.0
 	graph.Rank(0.85, 1e-6, func(node uint32, rank float64) {
-		if node == uint32(K.Rows-1) {
+		if node == uint32(K.Rows-2) {
 			result = rank
 		}
 	})
