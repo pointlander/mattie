@@ -22,9 +22,9 @@ const (
 	// Symbols
 	Symbols = ('z' - 'a' + 1) + ('Z' - 'A' + 1) + 3
 	// Size is the link size
-	Size = 4
+	Size = 32
 	// Input is the network input size
-	Input = Symbols + 2*Size
+	Input = Size + 2*Size
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// SetSize is the size of a symbol set
@@ -160,37 +160,35 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 		Count:  len(txt) + 1,
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
-	index := 0
-	for i := 0; i < len(txt)-1; i++ {
-		problem.Opt.Data[index+To[txt[i]]] = 1
-		index += Input
-	}
 	return problem
 }
 
 // Model model is the random matrix model
 type Model struct {
-	Query matrix.CompressedRandomMatrix
-	Key   matrix.CompressedRandomMatrix
-	Order matrix.CompressedRandomMatrix
+	Query  matrix.CompressedRandomMatrix
+	Key    matrix.CompressedRandomMatrix
+	Order  matrix.CompressedRandomMatrix
+	Symbol matrix.CompressedRandomMatrix
 }
 
 // Sample is a sample
 type Sample struct {
-	Query matrix.CompressedGenerator
-	Key   matrix.CompressedGenerator
-	Order matrix.CompressedGenerator
-	S     int
-	Cost  float64
+	Query  matrix.CompressedGenerator
+	Key    matrix.CompressedGenerator
+	Order  matrix.CompressedGenerator
+	Symbol matrix.CompressedGenerator
+	S      int
+	Cost   float64
 }
 
 // Search searches for a symbol
 func Search(sets Sets, s int, seed uint32) []Sample {
 	opt := sets.GetSingleTrainingData(s)
 	model := Model{
-		Query: matrix.NewCompressedRandomMatrix(Input, Input),
-		Key:   matrix.NewCompressedRandomMatrix(Input, Input),
-		Order: matrix.NewCompressedRandomMatrix(Size, opt.Size()),
+		Query:  matrix.NewCompressedRandomMatrix(Input, Input),
+		Key:    matrix.NewCompressedRandomMatrix(Input, Input),
+		Order:  matrix.NewCompressedRandomMatrix(Size, opt.Size()),
+		Symbol: matrix.NewCompressedRandomMatrix(Size, SetSize),
 	}
 	samples := make([]Sample, Samples)
 	rng := matrix.Rand(seed)
@@ -199,9 +197,11 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			query := model.Query.Sample(&rng)
 			key := model.Key.Sample(&rng)
 			order := model.Order.Sample(&rng)
+			symbol := model.Symbol.Sample(&rng)
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
 			samples[i*SetSize+j].Order = order
+			samples[i*SetSize+j].Symbol = symbol
 			samples[i*SetSize+j].S = j
 		}
 	}
@@ -212,9 +212,18 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		a, b := 0, 1
 		for j := 0; j < opt.Opt.Rows; j++ {
 			x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-			copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+Size], order.Data[x*Size:(x+1)*Size])
-			copy(opt.Opt.Data[j*Input+Symbols+Size:j*Input+Symbols+2*Size], order.Data[(y)*Size:(y+1)*Size])
+			copy(opt.Opt.Data[j*Input+Size:j*Input+Size+Size],
+				order.Data[x*Size:(x+1)*Size])
+			copy(opt.Opt.Data[j*Input+Size+Size:j*Input+Size+2*Size],
+				order.Data[(y)*Size:(y+1)*Size])
 			a, b = b, a
+		}
+		syms := sample.Symbol.Sample()
+		index := 0
+		for i := 0; i < len(opt.Input); i++ {
+			symbol := syms.Data[Size*To[opt.Input[i]] : Size*(To[opt.Input[i]]+1)]
+			copy(opt.Opt.Data[index:index+Input], symbol)
+			index += Input
 		}
 		params := opt.Opt.Data[Input*(opt.Size()-1):]
 		params[sample.S] = 1
