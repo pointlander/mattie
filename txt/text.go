@@ -111,8 +111,8 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcdabcda")
-	sets[2].Text = []byte("abcdabcdabcdabcdab")
+	sets[1].Text = []byte("abcdabcda")
+	sets[2].Text = []byte("abcdabcdabcdabcdabcdab")
 	sets[3].Text = []byte("abcdabcdabcdabcdabc")
 	sets[4].Text = []byte("abcdabcdabcdabcdabcd")
 	sets[5].Text = []byte("abcddcbaabcddcbaabcd")
@@ -188,7 +188,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		Query:  matrix.NewCompressedRandomMatrix(Input, Input),
 		Key:    matrix.NewCompressedRandomMatrix(Input, Input),
 		Order:  matrix.NewCompressedRandomMatrix(Size, opt.Size()),
-		Symbol: matrix.NewCompressedRandomMatrix(Size, SetSize),
+		Symbol: matrix.NewCompressedRandomMatrix(Size, Symbols),
 	}
 	samples := make([]Sample, Samples)
 	rng := matrix.Rand(seed)
