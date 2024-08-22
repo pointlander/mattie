@@ -26,6 +26,8 @@ github.com/pointlander/matrix v0.0.0-20240607004922-7137a4bd2ebe h1:sarVknwKU5p1
 github.com/pointlander/matrix v0.0.0-20240607004922-7137a4bd2ebe/go.mod h1:uV0Qn/6rCMrIh+TFYFGRpVeesmHB/3GftLPXbJUDdqY=
 github.com/pointlander/matrix v0.0.0-20240807194641-c5b792d1f604 h1:uQ4H+PEM4o3YtgMcPrSFpDnVa3SiWlQEXJtXgE1gx7w=
 github.com/pointlander/matrix v0.0.0-20240807194641-c5b792d1f604/go.mod h1:uV0Qn/6rCMrIh+TFYFGRpVeesmHB/3GftLPXbJUDdqY=
+github.com/pointlander/matrix v0.0.0-20240822051945-f950ba22f33b h1:aB+HZI49ohEKGO0Q6+t8PMXqKkNILAanY08lG8bHgs8=
+github.com/pointlander/matrix v0.0.0-20240822051945-f950ba22f33b/go.mod h1:uV0Qn/6rCMrIh+TFYFGRpVeesmHB/3GftLPXbJUDdqY=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

@@ -14,7 +14,7 @@ func TestText(t *testing.T) {
 	for i := 1; i < 5; i++ {
 		result := txt.Text(false, i)
 		if i != result {
-			t.Fatalf("fail %d!=%d", i, result)
+			t.Errorf("fail %d!=%d", i, result)
 		}
 	}
 }
