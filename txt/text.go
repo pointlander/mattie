@@ -267,322 +267,329 @@ func (f FilteredSet) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
 }
 
+const (
+	// SetSize is the size of a symbol set
+	SetSize = 4
+	// SampleSets is the number of samples per set
+	SampleSets = 100
+	// Samples is the number of samplee
+	Samples = SampleSets * SetSize
+)
+
+// Result is a search result
+type Result struct {
+	Context int
+	Symbol  int
+	Score   float64
+	Samples []Sample
+}
+
+// Search searches for a symbol
+func Search(sets Sets, s, context int, seed uint32, suffix []byte, depth int, results chan Result) {
+	depth--
+	opt := sets.GetSingleTrainingData(suffix, s, 0)
+	model := Model{
+		Query: matrix.NewCompressedRandomMatrix(Input, Input),
+		Key:   matrix.NewCompressedRandomMatrix(Input, Input),
+		Value: matrix.NewCompressedRandomMatrix(Input, Input),
+		Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
+	}
+	//stats := make([]float64, SetSize)
+	samples := make([]Sample, Samples)
+	rng := matrix.Rand(seed)
+	for i := 0; i < SampleSets; i++ {
+		for j := 0; j < SetSize; j++ {
+			query := model.Query.Sample(&rng)
+			key := model.Key.Sample(&rng)
+			value := model.Value.Sample(&rng)
+			order := model.Order.Sample(&rng)
+			samples[i*SetSize+j].Query = query
+			samples[i*SetSize+j].Key = key
+			samples[i*SetSize+j].Value = value
+			samples[i*SetSize+j].Order = order
+			samples[i*SetSize+j].S = j
+		}
+	}
+	done := make(chan bool, 8)
+	process := func(sample *Sample) {
+		opt := sets.GetSingleTrainingData(suffix, s, 0)
+		sum := 0.0
+		order := sample.Order.Sample()
+		a, b := 0, 1
+		jj := opt.Opt.Rows //- 1
+		for j := 0; j < jj; j++ {
+			x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
+			copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+			copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+			a, b = b, a
+		}
+		/*if x := jj + a; x < opt.Opt.Rows {
+			copy(opt.Opt.Data[jj*Input+Symbols:jj*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+		}
+		if y := jj + b; y < opt.Opt.Rows {
+			copy(opt.Opt.Data[jj*Input+Symbols+7:jj*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+		}*/
+		params := opt.Opt.Data[Input*(opt.Size()-1):]
+		params[sample.S] = 1
+		query := sample.Query.Sample()
+		key := sample.Key.Sample()
+		//value := sample.Value.Sample()
+		q := query.MulT(opt.Opt)
+		k := key.MulT(opt.Opt)
+		/*v := value.MulT(opt.Opt)
+		out := matrix.SelfAttention(q, k, v)*/
+		result := PageRank(q, k)
+		/*entropy := SelfEntropy(
+		query.MulT(opt.Opt),
+		key.MulT(opt.Opt),
+		value.MulT(opt.Opt))*/
+		/*for i := 0; i < out.Rows; i++ {
+			for j := i + 1; j < out.Rows; j++ {
+				distance := 0.0
+				for k := 0; k < out.Cols; k++ {
+					diff := float64(out.Data[i*out.Cols+k] - out.Data[j*out.Cols+k])
+					distance += diff * diff
+				}
+				sum += math.Sqrt(distance)
+			}
+		}*/
+		/*for _, value := range entropy {
+			sum += float64(value)
+		}*/
+		/*for j := 0; j < out.Rows; j++ {
+			for k := 0; k < out.Cols; k++ {
+				diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
+				sum += float64(diff*diff)
+			}
+		}*/
+		_ = sum
+		sample.Cost = result
+		done <- true
+	}
+	flight, index, cpus := 0, 0, runtime.NumCPU()
+	for flight < cpus && index < len(samples) {
+		sample := &samples[index]
+		go process(sample)
+		index++
+		flight++
+	}
+	for index < len(samples) {
+		<-done
+		flight--
+
+		sample := &samples[index]
+		go process(sample)
+		index++
+		flight++
+	}
+	for i := 0; i < flight; i++ {
+		<-done
+	}
+
+	sort.Slice(samples, func(i, j int) bool {
+		return samples[i].Cost < samples[j].Cost
+	})
+
+	/*costs := make([]float64, len(samples))
+	for i := range costs {
+		costs[i] = samples[i].Cost
+	}
+	spectrum := fft.FFTReal(costs)
+	cp := make([]complex128, len(spectrum))
+	copy(cp, spectrum)
+	filter := cp[:len(cp)/2]
+	for i := range filter {
+		filter[i] = 0
+	}
+	filtered := fft.IFFT(cp)
+	fs := make(FilteredSet, len(filtered))
+	for key, value := range filtered {
+		fs[key].Sample = &samples[key]
+		fs[key].Filtered = value
+	}
+	sort.Sort(fs)
+	output, err := os.Create(fmt.Sprintf("output/spectrum_%d.txt", seed))
+	if err != nil {
+		panic(err)
+	}
+	defer output.Close()
+	for _, value := range filtered {
+		fmt.Fprintf(output, "%f\n", cmplx.Abs(value))
+	}
+	points := make(plotter.XYs, len(spectrum)-1)
+	spectrum = spectrum[1:]
+	for i := range spectrum {
+		points[i] = plotter.XY{X: float64(i), Y: cmplx.Abs(spectrum[i])}
+	}
+
+	p := plot.New()
+	p.Title.Text = "spectrum"
+	p.X.Label.Text = "x"
+	p.Y.Label.Text = "y"
+	scatter, err := plotter.NewScatter(points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	p.Add(scatter)
+	err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("output/spectrum_%d.png", seed))
+	if err != nil {
+		panic(err)
+	}*/
+
+	/*avg, vr := 0.0, 0.0
+	for i := 0; i < len(samples); i++ {
+		avg += samples[i].Cost
+	}
+	avg /= float64(len(samples))
+	for i := 0; i < len(samples); i++ {
+		diff := samples[i].Cost - avg
+		vr += diff * diff
+	}
+	vr /= float64(len(samples))
+	type Cut struct {
+		Reduction float64
+		Index     int
+	}
+	cuts := make(chan Cut, 8)
+	mvr := func(i int) {
+		avga, avgb := 0.0, 0.0
+		vara, varb := 0.0, 0.0
+		for j := 0; j < i; j++ {
+			avga += samples[j].Cost
+		}
+		avga /= float64(i)
+		for j := 0; j < i; j++ {
+			diff := samples[j].Cost - avga
+			vara += diff * diff
+		}
+		vara /= float64(i)
+		for j := i; j < len(samples); j++ {
+			avgb += samples[j].Cost
+		}
+		avgb /= float64(len(samples) - i)
+		for j := i; j < len(samples); j++ {
+			diff := samples[j].Cost - avgb
+			varb += diff * diff
+		}
+		varb /= float64(len(samples) - i)
+		reduction := vr - (vara + varb)
+		cuts <- Cut{
+			Reduction: reduction,
+			Index:     i,
+		}
+	}
+	maxReduction, cut := 0.0, 0
+	flight, index, cpus = 0, 1, runtime.NumCPU()
+	for flight < cpus && index < len(samples)-1 {
+		go mvr(index)
+		index++
+		flight++
+	}
+	for index < len(samples)-1 {
+		result := <-cuts
+		if result.Reduction > maxReduction {
+			maxReduction, cut = result.Reduction, result.Index
+		}
+		flight--
+
+		go mvr(index)
+		index++
+		flight++
+	}
+	for i := 0; i < flight; i++ {
+		result := <-cuts
+		if result.Reduction > maxReduction {
+			maxReduction, cut = result.Reduction, result.Index
+		}
+	}*/
+
+	/*factor := [Symbols]float64{}
+	for sample := range samples {
+		index := samples[sample].S
+		scale := samples[sample].Cost - factor[index]
+		if scale < 0 {
+			scale = -scale
+		}
+		factor[index] = samples[sample].Cost
+		if scale == 0 {
+			continue
+		}
+		stats[index] += 1 / float64(scale)
+	}*/
+
+	avg := [SetSize]float64{}
+	count := [SetSize]float64{}
+	for sample := range samples {
+		index := samples[sample].S
+		avg[index] += samples[sample].Cost
+		count[index]++
+	}
+	for i := range avg {
+		avg[i] /= count[i]
+	}
+	stddev := [SetSize]float64{}
+	for sample := range samples {
+		index := samples[sample].S
+		diff := avg[index] - samples[sample].Cost
+		stddev[index] += diff * diff
+	}
+	for i, v := range stddev {
+		stddev[i] = math.Sqrt(v)
+	}
+	/*vr = math.Sqrt(vr)
+	for sample := range samples {
+		x := samples[sample].Cost
+		g := math.Exp(-(x-avg)*(x-avg)/(2*vr*vr)) / (vr * math.Sqrt(2*math.Pi))
+		index := samples[sample].S
+		stats[index] += 1 / g
+	}*/
+	fmt.Println(stddev)
+
+	max, index := 0.0, 0
+	if depth > 0 {
+		results := make(chan Result, Symbols)
+		for i := range stddev[:4] {
+			cp := make([]byte, len(suffix))
+			copy(cp, suffix)
+			suffix := append(cp, byte(i))
+			seed := rng.Uint32() + 1
+			if seed == 0 {
+				seed = 1
+			}
+			go Search(sets, s, i, seed, suffix, depth, results)
+		}
+		count := 0
+		for result := range results {
+			if score := result.Score + stddev[result.Context]; score > max {
+				max, index = score, result.Context
+			}
+			count++
+			if count == Symbols {
+				break
+			}
+		}
+	} else {
+		for i, stat := range avg[:4] {
+			stat /= stddev[i]
+			if stat > max {
+				max, index = stat, i
+			}
+		}
+	}
+	results <- Result{
+		Context: context,
+		Symbol:  index,
+		Score:   avg[index],
+		Samples: samples,
+	}
+}
+
 // Text mode
 func Text(full bool, s int) int {
 	os.Mkdir("output", 0755)
 	sets := Load()
-	const (
-		SetSize    = 4
-		SampleSets = 100
-		Samples    = SampleSets * SetSize
-	)
-	type Result struct {
-		Context int
-		Symbol  int
-		Score   float64
-		Samples []Sample
-	}
-	var search func(context int, seed uint32, suffix []byte, depth int, results chan Result)
-	search = func(context int, seed uint32, suffix []byte, depth int, results chan Result) {
-		depth--
-		opt := sets.GetSingleTrainingData(suffix, s, 0)
-		model := Model{
-			Query: matrix.NewCompressedRandomMatrix(Input, Input),
-			Key:   matrix.NewCompressedRandomMatrix(Input, Input),
-			Value: matrix.NewCompressedRandomMatrix(Input, Input),
-			Order: matrix.NewCompressedRandomMatrix(7, opt.Size()),
-		}
-		//stats := make([]float64, SetSize)
-		samples := make([]Sample, Samples)
-		rng := matrix.Rand(seed)
-		for i := 0; i < SampleSets; i++ {
-			for j := 0; j < SetSize; j++ {
-				query := model.Query.Sample(&rng)
-				key := model.Key.Sample(&rng)
-				value := model.Value.Sample(&rng)
-				order := model.Order.Sample(&rng)
-				samples[i*SetSize+j].Query = query
-				samples[i*SetSize+j].Key = key
-				samples[i*SetSize+j].Value = value
-				samples[i*SetSize+j].Order = order
-				samples[i*SetSize+j].S = j
-			}
-		}
-		done := make(chan bool, 8)
-		process := func(sample *Sample) {
-			opt := sets.GetSingleTrainingData(suffix, s, 0)
-			sum := 0.0
-			order := sample.Order.Sample()
-			a, b := 0, 1
-			jj := opt.Opt.Rows //- 1
-			for j := 0; j < jj; j++ {
-				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
-				a, b = b, a
-			}
-			/*if x := jj + a; x < opt.Opt.Rows {
-				copy(opt.Opt.Data[jj*Input+Symbols:jj*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-			}
-			if y := jj + b; y < opt.Opt.Rows {
-				copy(opt.Opt.Data[jj*Input+Symbols+7:jj*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
-			}*/
-			params := opt.Opt.Data[Input*(opt.Size()-1):]
-			params[sample.S] = 1
-			query := sample.Query.Sample()
-			key := sample.Key.Sample()
-			//value := sample.Value.Sample()
-			q := query.MulT(opt.Opt)
-			k := key.MulT(opt.Opt)
-			/*v := value.MulT(opt.Opt)
-			out := matrix.SelfAttention(q, k, v)*/
-			result := PageRank(q, k)
-			/*entropy := SelfEntropy(
-			query.MulT(opt.Opt),
-			key.MulT(opt.Opt),
-			value.MulT(opt.Opt))*/
-			/*for i := 0; i < out.Rows; i++ {
-				for j := i + 1; j < out.Rows; j++ {
-					distance := 0.0
-					for k := 0; k < out.Cols; k++ {
-						diff := float64(out.Data[i*out.Cols+k] - out.Data[j*out.Cols+k])
-						distance += diff * diff
-					}
-					sum += math.Sqrt(distance)
-				}
-			}*/
-			/*for _, value := range entropy {
-				sum += float64(value)
-			}*/
-			/*for j := 0; j < out.Rows; j++ {
-				for k := 0; k < out.Cols; k++ {
-					diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
-					sum += float64(diff*diff)
-				}
-			}*/
-			_ = sum
-			sample.Cost = result
-			done <- true
-		}
-		flight, index, cpus := 0, 0, runtime.NumCPU()
-		for flight < cpus && index < len(samples) {
-			sample := &samples[index]
-			go process(sample)
-			index++
-			flight++
-		}
-		for index < len(samples) {
-			<-done
-			flight--
-
-			sample := &samples[index]
-			go process(sample)
-			index++
-			flight++
-		}
-		for i := 0; i < flight; i++ {
-			<-done
-		}
-
-		sort.Slice(samples, func(i, j int) bool {
-			return samples[i].Cost < samples[j].Cost
-		})
-
-		/*costs := make([]float64, len(samples))
-		for i := range costs {
-			costs[i] = samples[i].Cost
-		}
-		spectrum := fft.FFTReal(costs)
-		cp := make([]complex128, len(spectrum))
-		copy(cp, spectrum)
-		filter := cp[:len(cp)/2]
-		for i := range filter {
-			filter[i] = 0
-		}
-		filtered := fft.IFFT(cp)
-		fs := make(FilteredSet, len(filtered))
-		for key, value := range filtered {
-			fs[key].Sample = &samples[key]
-			fs[key].Filtered = value
-		}
-		sort.Sort(fs)
-		output, err := os.Create(fmt.Sprintf("output/spectrum_%d.txt", seed))
-		if err != nil {
-			panic(err)
-		}
-		defer output.Close()
-		for _, value := range filtered {
-			fmt.Fprintf(output, "%f\n", cmplx.Abs(value))
-		}
-		points := make(plotter.XYs, len(spectrum)-1)
-		spectrum = spectrum[1:]
-		for i := range spectrum {
-			points[i] = plotter.XY{X: float64(i), Y: cmplx.Abs(spectrum[i])}
-		}
-
-		p := plot.New()
-		p.Title.Text = "spectrum"
-		p.X.Label.Text = "x"
-		p.Y.Label.Text = "y"
-		scatter, err := plotter.NewScatter(points)
-		if err != nil {
-			panic(err)
-		}
-		scatter.GlyphStyle.Radius = vg.Length(1)
-		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-		p.Add(scatter)
-		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("output/spectrum_%d.png", seed))
-		if err != nil {
-			panic(err)
-		}*/
-
-		/*avg, vr := 0.0, 0.0
-		for i := 0; i < len(samples); i++ {
-			avg += samples[i].Cost
-		}
-		avg /= float64(len(samples))
-		for i := 0; i < len(samples); i++ {
-			diff := samples[i].Cost - avg
-			vr += diff * diff
-		}
-		vr /= float64(len(samples))
-		type Cut struct {
-			Reduction float64
-			Index     int
-		}
-		cuts := make(chan Cut, 8)
-		mvr := func(i int) {
-			avga, avgb := 0.0, 0.0
-			vara, varb := 0.0, 0.0
-			for j := 0; j < i; j++ {
-				avga += samples[j].Cost
-			}
-			avga /= float64(i)
-			for j := 0; j < i; j++ {
-				diff := samples[j].Cost - avga
-				vara += diff * diff
-			}
-			vara /= float64(i)
-			for j := i; j < len(samples); j++ {
-				avgb += samples[j].Cost
-			}
-			avgb /= float64(len(samples) - i)
-			for j := i; j < len(samples); j++ {
-				diff := samples[j].Cost - avgb
-				varb += diff * diff
-			}
-			varb /= float64(len(samples) - i)
-			reduction := vr - (vara + varb)
-			cuts <- Cut{
-				Reduction: reduction,
-				Index:     i,
-			}
-		}
-		maxReduction, cut := 0.0, 0
-		flight, index, cpus = 0, 1, runtime.NumCPU()
-		for flight < cpus && index < len(samples)-1 {
-			go mvr(index)
-			index++
-			flight++
-		}
-		for index < len(samples)-1 {
-			result := <-cuts
-			if result.Reduction > maxReduction {
-				maxReduction, cut = result.Reduction, result.Index
-			}
-			flight--
-
-			go mvr(index)
-			index++
-			flight++
-		}
-		for i := 0; i < flight; i++ {
-			result := <-cuts
-			if result.Reduction > maxReduction {
-				maxReduction, cut = result.Reduction, result.Index
-			}
-		}*/
-
-		/*factor := [Symbols]float64{}
-		for sample := range samples {
-			index := samples[sample].S
-			scale := samples[sample].Cost - factor[index]
-			if scale < 0 {
-				scale = -scale
-			}
-			factor[index] = samples[sample].Cost
-			if scale == 0 {
-				continue
-			}
-			stats[index] += 1 / float64(scale)
-		}*/
-
-		avg := [SetSize]float64{}
-		count := [SetSize]float64{}
-		for sample := range samples {
-			index := samples[sample].S
-			avg[index] += samples[sample].Cost
-			count[index]++
-		}
-		for i := range avg {
-			avg[i] /= count[i]
-		}
-		stddev := [SetSize]float64{}
-		for sample := range samples {
-			index := samples[sample].S
-			diff := avg[index] - samples[sample].Cost
-			stddev[index] += diff * diff
-		}
-		for i, v := range stddev {
-			stddev[i] = math.Sqrt(v)
-		}
-		/*vr = math.Sqrt(vr)
-		for sample := range samples {
-			x := samples[sample].Cost
-			g := math.Exp(-(x-avg)*(x-avg)/(2*vr*vr)) / (vr * math.Sqrt(2*math.Pi))
-			index := samples[sample].S
-			stats[index] += 1 / g
-		}*/
-		fmt.Println(stddev)
-
-		max, index := 0.0, 0
-		if depth > 0 {
-			results := make(chan Result, Symbols)
-			for i := range stddev[:4] {
-				cp := make([]byte, len(suffix))
-				copy(cp, suffix)
-				s := append(cp, byte(i))
-				seed := rng.Uint32() + 1
-				if seed == 0 {
-					seed = 1
-				}
-				go search(i, seed, s, depth, results)
-			}
-			count := 0
-			for result := range results {
-				if score := result.Score + stddev[result.Context]; score > max {
-					max, index = score, result.Context
-				}
-				count++
-				if count == Symbols {
-					break
-				}
-			}
-		} else {
-			for i, stat := range avg[:4] {
-				stat /= stddev[i]
-				if stat > max {
-					max, index = stat, i
-				}
-			}
-		}
-		results <- Result{
-			Context: context,
-			Symbol:  index,
-			Score:   avg[index],
-			Samples: samples,
-		}
-	}
 	opt := sets.GetSingleTrainingData([]byte{}, s, 0)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
@@ -592,7 +599,7 @@ func Text(full bool, s int) int {
 	histogram := make([]int, 4)
 	samples := []Sample{}
 	for i := 1; i < 64; i++ {
-		search(0, uint32(i), []byte{}, 1, results)
+		Search(sets, s, 0, uint32(i), []byte{}, 1, results)
 		result := <-results
 		fmt.Printf("%d %c %f\n", i, From[result.Symbol], result.Score)
 		symbols = []byte{byte(result.Symbol)}
@@ -649,7 +656,7 @@ func Text(full bool, s int) int {
 	fmt.Println(metric)
 	if full {
 		for i := 0; i < 100; i++ {
-			search(0, uint32(i)+16, symbols, 1, results)
+			Search(sets, s, 0, uint32(i)+16, symbols, 1, results)
 			result := <-results
 			fmt.Printf("%c %f\n", From[result.Symbol], result.Score)
 			symbols = append(symbols, byte(result.Symbol))
