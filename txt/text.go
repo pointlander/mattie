@@ -131,7 +131,7 @@ func (p Problem) Size() int {
 }
 
 // GetSingleTrainingData gets the training data
-func (sets Sets) GetSingleTrainingData(s, t int) Problem {
+func (sets Sets) GetSingleTrainingData(s int) Problem {
 	if s == 0 {
 		set := sets[s]
 		txt := make([]byte, len(set.Text[2048:2048+512]))
@@ -182,14 +182,9 @@ type Sample struct {
 	Cost  float64
 }
 
-// Result is a search result
-type Result struct {
-	Samples []Sample
-}
-
 // Search searches for a symbol
-func Search(sets Sets, s, context int, seed uint32, results chan Result) {
-	opt := sets.GetSingleTrainingData(s, 0)
+func Search(sets Sets, s int, seed uint32) []Sample {
+	opt := sets.GetSingleTrainingData(s)
 	model := Model{
 		Query: matrix.NewCompressedRandomMatrix(Input, Input),
 		Key:   matrix.NewCompressedRandomMatrix(Input, Input),
@@ -211,7 +206,7 @@ func Search(sets Sets, s, context int, seed uint32, results chan Result) {
 	}
 	done := make(chan bool, 8)
 	process := func(sample *Sample) {
-		opt := sets.GetSingleTrainingData(s, 0)
+		opt := sets.GetSingleTrainingData(s)
 		order := sample.Order.Sample()
 		a, b := 0, 1
 		for j := 0; j < opt.Opt.Rows; j++ {
@@ -249,24 +244,19 @@ func Search(sets Sets, s, context int, seed uint32, results chan Result) {
 		<-done
 	}
 
-	results <- Result{
-		Samples: samples,
-	}
+	return samples
 }
 
 // Text mode
 func Text(full bool, s int) int {
-	os.Mkdir("output", 0755)
 	sets := Load()
-	opt := sets.GetSingleTrainingData(s, 0)
+	opt := sets.GetSingleTrainingData(s)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
-	results := make(chan Result, Symbols)
 	samples := []Sample{}
 	for i := 1; i < 64; i++ {
-		Search(sets, s, 0, uint32(i), results)
-		result := <-results
-		samples = append(samples, result.Samples...)
+		result := Search(sets, s, uint32(i))
+		samples = append(samples, result...)
 	}
 	avg := [SetSize]float64{}
 	count := [SetSize]float64{}
