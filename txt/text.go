@@ -30,7 +30,7 @@ const (
 	// SetSize is the size of a symbol set
 	SetSize = 4
 	// SampleSets is the number of samples per set
-	SampleSets = 100
+	SampleSets = 50
 	// Samples is the number of samplee
 	Samples = SampleSets * SetSize * SetSize
 )
