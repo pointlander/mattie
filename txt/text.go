@@ -32,7 +32,7 @@ const (
 	// SampleSets is the number of samples per set
 	SampleSets = 100
 	// Samples is the number of samplee
-	Samples = SampleSets * SetSize
+	Samples = SampleSets * SetSize * SetSize
 )
 
 var (
@@ -157,7 +157,7 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 	problem := Problem{
 		Input:  txt[:len(txt)-1],
 		Output: txt[len(txt)-1:],
-		Count:  len(txt) + 1,
+		Count:  len(txt) + 2,
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	return problem
@@ -177,7 +177,7 @@ type Sample struct {
 	Key    matrix.CompressedGenerator
 	Order  matrix.CompressedGenerator
 	Symbol matrix.CompressedGenerator
-	S      int
+	S      [2]int
 	Cost   float64
 }
 
@@ -194,15 +194,18 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	rng := matrix.Rand(seed)
 	for i := 0; i < SampleSets; i++ {
 		for j := 0; j < SetSize; j++ {
-			query := model.Query.Sample(&rng)
-			key := model.Key.Sample(&rng)
-			order := model.Order.Sample(&rng)
-			symbol := model.Symbol.Sample(&rng)
-			samples[i*SetSize+j].Query = query
-			samples[i*SetSize+j].Key = key
-			samples[i*SetSize+j].Order = order
-			samples[i*SetSize+j].Symbol = symbol
-			samples[i*SetSize+j].S = j
+			for k := 0; k < SetSize; k++ {
+				query := model.Query.Sample(&rng)
+				key := model.Key.Sample(&rng)
+				order := model.Order.Sample(&rng)
+				symbol := model.Symbol.Sample(&rng)
+				samples[i*SetSize*SetSize+j*SetSize+k].Query = query
+				samples[i*SetSize*SetSize+j*SetSize+k].Key = key
+				samples[i*SetSize*SetSize+j*SetSize+k].Order = order
+				samples[i*SetSize*SetSize+j*SetSize+k].Symbol = symbol
+				samples[i*SetSize*SetSize+j*SetSize+k].S[0] = j
+				samples[i*SetSize*SetSize+j*SetSize+k].S[1] = k
+			}
 		}
 	}
 	done := make(chan bool, 8)
@@ -215,7 +218,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			copy(opt.Opt.Data[j*Input+Size:j*Input+Size+Size],
 				order.Data[x*Size:(x+1)*Size])
 			copy(opt.Opt.Data[j*Input+Size+Size:j*Input+Size+2*Size],
-				order.Data[(y)*Size:(y+1)*Size])
+				order.Data[y*Size:(y+1)*Size])
 			a, b = b, a
 		}
 		syms := sample.Symbol.Sample()
@@ -225,8 +228,12 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			copy(opt.Opt.Data[index:index+Input], symbol)
 			index += Input
 		}
-		params := opt.Opt.Data[Input*(opt.Size()-1):]
-		params[sample.S] = 1
+		params := opt.Opt.Data[Input*(opt.Size()-2) : Input*(opt.Size()-2)+Size]
+		symbol := syms.Data[Size*To[byte(sample.S[0])] : Size*(To[byte(sample.S[0])]+1)]
+		copy(params, symbol)
+		params = opt.Opt.Data[Input*(opt.Size()-1) : Input*(opt.Size()-1)+Size]
+		symbol = syms.Data[Size*To[byte(sample.S[1])] : Size*(To[byte(sample.S[1])]+1)]
+		copy(params, symbol)
 		query := sample.Query.Sample()
 		key := sample.Key.Sample()
 		q := query.MulT(opt.Opt)
@@ -268,8 +275,8 @@ func Text(full bool, s int) int {
 		result := Search(sets, s, uint32(i))
 		samples = append(samples, result...)
 	}
-	avg := [SetSize]float64{}
-	count := [SetSize]float64{}
+	avg := make(map[[2]int]float64)
+	count := make(map[[2]int]float64)
 	for sample := range samples {
 		index := samples[sample].S
 		avg[index] += samples[sample].Cost
@@ -278,7 +285,7 @@ func Text(full bool, s int) int {
 	for i := range avg {
 		avg[i] /= count[i]
 	}
-	stddev := [SetSize]float64{}
+	stddev := make(map[[2]int]float64)
 	for sample := range samples {
 		index := samples[sample].S
 		diff := avg[index] - samples[sample].Cost
@@ -289,17 +296,17 @@ func Text(full bool, s int) int {
 	}
 	fmt.Println(avg)
 	fmt.Println(stddev)
-	metric := [SetSize]float64{}
+	metric := make(map[[2]int]float64)
 	for i, v := range avg {
 		metric[i] = v / stddev[i]
 	}
 	fmt.Println(metric)
-	max, sym := 0.0, 0
+	max, sym := 0.0, [2]int{}
 	for key, value := range avg {
 		value /= stddev[key]
 		if value > max {
 			max, sym = value, key
 		}
 	}
-	return sym + 1
+	return sym[0] + 1
 }
