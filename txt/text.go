@@ -169,7 +169,6 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 
 // Model model is the random matrix model
 type Model struct {
-	C      matrix.CompressedRandomMatrix
 	Query  matrix.CompressedRandomMatrix
 	Key    matrix.CompressedRandomMatrix
 	Order  matrix.CompressedRandomMatrix
@@ -179,7 +178,6 @@ type Model struct {
 // Sample is a sample
 type Sample struct {
 	Rng    *matrix.Rand
-	C      matrix.CompressedGenerator
 	Query  matrix.CompressedGenerator
 	Key    matrix.CompressedGenerator
 	Order  matrix.CompressedGenerator
@@ -194,9 +192,8 @@ type Sample struct {
 func Search(sets Sets, s int, seed uint32) []Sample {
 	opt := sets.GetSingleTrainingData(s)
 	model := Model{
-		C:      matrix.NewCompressedRandomMatrix(Input, Input/2),
-		Query:  matrix.NewCompressedRandomMatrix(Input, Input/2),
-		Key:    matrix.NewCompressedRandomMatrix(Input, Input/2),
+		Query:  matrix.NewCompressedRandomMatrix(Input, Input),
+		Key:    matrix.NewCompressedRandomMatrix(Input, Input),
 		Order:  matrix.NewCompressedRandomMatrix(Size, opt.Size()),
 		Symbol: matrix.NewCompressedRandomMatrix(Size, Symbols),
 	}
@@ -204,18 +201,18 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	rng := matrix.Rand(seed)
 	for i := 0; i < SampleSets; i++ {
 		for j := 0; j < SetSize; j++ {
-			c := model.C.Sample(&rng)
 			query := model.Query.Sample(&rng)
 			key := model.Key.Sample(&rng)
-			order := model.Order.Sample(&rng)
-			symbol := model.Symbol.Sample(&rng)
+			rngOrder := matrix.Rand(1)
+			order := model.Order.Sample(&rngOrder)
+			rngSymbol := matrix.Rand(1)
+			symbol := model.Symbol.Sample(&rngSymbol)
 			/*seed := rng.Uint32()
 			if seed == 0 {
 				seed += 1
 			}
 			Rng := matrix.Rand(seed)
 			samples[i*SetSize+j].Rng = &Rng*/
-			samples[i*SetSize+j].C = c
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
 			samples[i*SetSize+j].Order = order
@@ -250,7 +247,6 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		for i := range opt.Opt.Data {
 			opt.Opt.Data[i] += float32(factor * sample.Rng.Float64())
 		}*/
-		//c := sample.C.Sample()
 		query := sample.Query.Sparse()
 		key := sample.Key.Sparse()
 		mult := query.MulT(key)
