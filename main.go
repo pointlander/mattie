@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/pointlander/mattie/original"
 	"github.com/pointlander/mattie/random"
@@ -45,7 +46,26 @@ func main() {
 		text2.Text2()
 		return
 	} else if *FlagTxt {
-		txt.Text(*FlagFull, 1)
+		var seed uint32 = 0
+	outer:
+		for {
+			seed++
+			fmt.Println(seed)
+			for i := 1; i < 5; i++ {
+				result := txt.Text(false, i, seed)
+				if i != result {
+					fmt.Printf("fail %d!=%d\n", i, result)
+					continue outer
+				}
+			}
+			result := txt.Text(false, 5, seed)
+			if result != 4 {
+				fmt.Printf("fail 4!=%d\n", result)
+				continue outer
+			}
+			break
+		}
+		fmt.Println(seed)
 		return
 	}
 }

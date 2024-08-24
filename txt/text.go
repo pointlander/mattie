@@ -202,9 +202,9 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			/*seed := rng.Uint32()
 			if seed == 0 {
 				seed += 1
-			}*/
-			Rng := matrix.Rand(1)
-			samples[i*SetSize+j].Rng = &Rng
+			}
+			Rng := matrix.Rand(seed)
+			samples[i*SetSize+j].Rng = &Rng*/
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
 			samples[i*SetSize+j].Order = order
@@ -234,10 +234,10 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		}
 		params := opt.Opt.Data[Input*(opt.Size()-1):]
 		params[sample.S] = 1
-		factor := 1.0 / float64(Input)
+		/*factor := 1.0 / float64(Input)
 		for i := range opt.Opt.Data {
 			opt.Opt.Data[i] += float32(factor * sample.Rng.Float64())
-		}
+		}*/
 		query := sample.Query.Sample()
 		key := sample.Key.Sample()
 		q := query.MulT(opt.Opt)
@@ -269,14 +269,19 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 }
 
 // Text mode
-func Text(full bool, s int) int {
+func Text(full bool, s int, ss uint32) int {
 	sets := Load()
 	opt := sets.GetSingleTrainingData(s)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	samples := []Sample{}
+	rng := matrix.Rand(ss)
 	for i := 1; i < 64; i++ {
-		result := Search(sets, s, uint32(i))
+		seed := rng.Uint32()
+		if seed == 0 {
+			seed = 1
+		}
+		result := Search(sets, s, seed)
 		samples = append(samples, result...)
 	}
 	avg := [SetSize]float64{}
