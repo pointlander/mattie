@@ -12,7 +12,7 @@ import (
 
 func TestText(t *testing.T) {
 	for i := 1; i < 5; i++ {
-		result := txt.Text(false, i, 61)
+		result := txt.Text(false, i, 1522)
 		if i != result {
 			t.Errorf("fail %d!=%d", i, result)
 		}
@@ -20,7 +20,7 @@ func TestText(t *testing.T) {
 }
 
 func TestText2(t *testing.T) {
-	result := txt.Text(false, 5, 61)
+	result := txt.Text(false, 5, 1522)
 	if result != 4 {
 		t.Fatalf("fail 4!=%d", result)
 	}
