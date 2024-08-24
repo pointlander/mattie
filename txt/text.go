@@ -173,6 +173,7 @@ type Model struct {
 
 // Sample is a sample
 type Sample struct {
+	Rng    *matrix.Rand
 	Query  matrix.CompressedGenerator
 	Key    matrix.CompressedGenerator
 	Order  matrix.CompressedGenerator
@@ -198,6 +199,12 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			key := model.Key.Sample(&rng)
 			order := model.Order.Sample(&rng)
 			symbol := model.Symbol.Sample(&rng)
+			/*seed := rng.Uint32()
+			if seed == 0 {
+				seed += 1
+			}*/
+			Rng := matrix.Rand(1)
+			samples[i*SetSize+j].Rng = &Rng
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
 			samples[i*SetSize+j].Order = order
@@ -227,6 +234,10 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		}
 		params := opt.Opt.Data[Input*(opt.Size()-1):]
 		params[sample.S] = 1
+		factor := 1.0 / float64(Input)
+		for i := range opt.Opt.Data {
+			opt.Opt.Data[i] += float32(factor * sample.Rng.Float64())
+		}
 		query := sample.Query.Sample()
 		key := sample.Key.Sample()
 		q := query.MulT(opt.Opt)
