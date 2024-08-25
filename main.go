@@ -71,17 +71,21 @@ func main() {
 		fmt.Println(seed)
 		return
 	} else if *FlagBrute {
-		rng := matrix.Rand(1)
-		histogram := [4]int{}
-		for i := 0; i < 64; i++ {
-			fmt.Println(i)
-			seed := rng.Uint32()
-			if seed == 0 {
-				seed = 1
+		histogram := [5][4]int{}
+		for h := range histogram {
+			rng := matrix.Rand(1)
+			for i := 0; i < 256; i++ {
+				fmt.Println(i)
+				seed := rng.Uint32()
+				if seed == 0 {
+					seed = 1
+				}
+				result := txt.Text(false, h+1, seed)
+				histogram[h][result-1]++
 			}
-			result := txt.Text(false, 1, seed)
-			histogram[result-1]++
 		}
-		fmt.Println(histogram)
+		for h := range histogram {
+			fmt.Println(histogram[h])
+		}
 	}
 }
