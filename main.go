@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/pointlander/matrix"
 	"github.com/pointlander/mattie/original"
 	"github.com/pointlander/mattie/random"
 	"github.com/pointlander/mattie/text"
@@ -28,6 +29,8 @@ var (
 	FlagTxt = flag.Bool("txt", false, "true txt mode")
 	// FlagFull computes the full string
 	FlagFull = flag.Bool("full", false, "compute the full string")
+	// FlagBrute brute mode
+	FlagBrute = flag.Bool("brute", false, "brute mode")
 )
 
 func main() {
@@ -67,5 +70,18 @@ func main() {
 		}
 		fmt.Println(seed)
 		return
+	} else if *FlagBrute {
+		rng := matrix.Rand(1)
+		histogram := [4]int{}
+		for i := 0; i < 64; i++ {
+			fmt.Println(i)
+			seed := rng.Uint32()
+			if seed == 0 {
+				seed = 1
+			}
+			result := txt.Text(false, 1, seed)
+			histogram[result-1]++
+		}
+		fmt.Println(histogram)
 	}
 }
