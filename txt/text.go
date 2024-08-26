@@ -24,7 +24,7 @@ const (
 	// Size is the link size
 	Size = 8
 	// Input is the network input size
-	Input = Size + Size
+	Input = Size + 2*Size
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// SetSize is the size of a symbol set
@@ -73,9 +73,19 @@ func PageRank(Q, K matrix.Matrix) float64 {
 	graph := pagerank.NewGraph()
 	for i := 0; i < K.Rows; i++ {
 		K := K.Data[i*K.Cols : (i+1)*K.Cols]
+		aa := 0.0
+		for _, v := range K {
+			aa += float64(v * v)
+		}
+		aa = math.Sqrt(aa)
 		for j := 0; j < Q.Rows; j++ {
 			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
-			d := float64(vector.Dot(K, Q))
+			bb := 0.0
+			for _, v := range Q {
+				bb += float64(v * v)
+			}
+			bb = math.Sqrt(bb)
+			d := float64(vector.Dot(K, Q)) / (aa * bb)
 			graph.Link(uint32(i), uint32(j), d*d)
 		}
 	}
@@ -219,7 +229,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	done := make(chan bool, 8)
 	process := func(sample *Sample) {
 		opt := sets.GetSingleTrainingData(s)
-		rng := sample.Rng
+		/*rng := sample.Rng
 		order := make([]float32, Size)
 		for i := range order {
 			order[i] = float32(rng.NormFloat64())
@@ -229,8 +239,8 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			for j, value := range order {
 				order[j] = (value + float32(rng.NormFloat64())) / 2
 			}
-		}
-		/*order := sample.Order.Sample()
+		}*/
+		order := sample.Order.Sample()
 		a, b := 0, 1
 		jj := opt.Opt.Rows - 1
 		for j := 0; j < jj; j++ {
@@ -248,7 +258,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		if y := jj + b; y < opt.Opt.Rows {
 			copy(opt.Opt.Data[jj*Input+Size+Size:jj*Input+Size+2*Size],
 				order.Data[(y)*Size:(y+1)*Size])
-		}*/
+		}
 		syms := sample.Symbol.Sample()
 		index := 0
 		for i := 0; i < len(opt.Input); i++ {
