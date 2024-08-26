@@ -190,8 +190,6 @@ type Sample struct {
 	Symbol matrix.CompressedGenerator
 	S      int
 	Cost   float64
-	Corr   float64
-	Mult   float64
 }
 
 // Search searches for a symbol
@@ -273,49 +271,8 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		for i := range opt.Opt.Data {
 			opt.Opt.Data[i] += float32(factor * sample.Rng.Float64())
 		}*/
-		query := sample.Query.Sparse()
-		key := sample.Key.Sparse()
-		mult := query.MulT(key)
-		sum := 0.0
-		for i := range mult.Data {
-			sum += math.Abs(float64(mult.Data[i]))
-		}
-		sample.Mult = sum
-		found := 0.0
-		/*for {
-			corr := 0.0
-			mquery, mkey := 0.0, 0.0
-			for _, v := range query.Data {
-				mquery += float64(v)
-			}
-			mquery /= float64(len(query.Data))
-			for _, v := range key.Data {
-				mkey += float64(v)
-			}
-			mkey /= float64(len(query.Data))
-			stddevquery := 0.0
-			stddevkey := 0.0
-
-			for i, v := range query.Data {
-				diffquery := float64(v) - mquery
-				diffkey := float64(key.Data[i]) - mkey
-				stddevquery += diffquery * diffquery
-				stddevkey += diffkey * diffkey
-				corr += diffquery * diffkey
-			}
-			stddevquery = math.Sqrt(stddevquery)
-			stddevkey = math.Sqrt(stddevkey)
-			corr = (corr / float64(len(query.Data))) / (stddevquery * stddevkey)
-			if corr > 1e-10 || corr < -1e-10 {
-				found = corr
-				break
-			}
-			query = sample.Query.Sample()
-			key = sample.Key.Sample()
-		}*/
-		sample.Corr = found
-		//query = query.H(c)
-		//key = key.H(c)
+		query := sample.Query.Sample()
+		key := sample.Key.Sample()
 		q := query.MulT(opt.Opt)
 		k := key.MulT(opt.Opt)
 		sample.Cost = PageRank(q, k)
@@ -362,14 +319,10 @@ func Text(full bool, s int, ss uint32) int {
 	}
 	avg := [SetSize]float64{}
 	count := [SetSize]float64{}
-	corr := 0.0
-	mult := 0.0
 	for sample := range samples {
 		index := samples[sample].S
 		avg[index] += samples[sample].Cost
 		count[index]++
-		corr += samples[sample].Corr
-		mult += samples[sample].Mult
 	}
 	for i := range avg {
 		avg[i] /= count[i]
@@ -390,8 +343,6 @@ func Text(full bool, s int, ss uint32) int {
 		metric[i] = v / stddev[i]
 	}
 	fmt.Println(metric)
-	fmt.Println(corr)
-	fmt.Println(mult)
 	max, sym := 0.0, 0
 	for key, value := range avg {
 		value /= stddev[key]
