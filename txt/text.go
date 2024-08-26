@@ -167,7 +167,7 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 	problem := Problem{
 		Input:  txt[:len(txt)-1],
 		Output: txt[len(txt)-1:],
-		Count:  len(txt),
+		Count:  len(txt) + 1,
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	return problem
@@ -260,7 +260,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 				order.Data[(y)*Size:(y+1)*Size])
 		}
 		syms := sample.Symbol.Sample()
-		index := 0
+		index := Input
 		for i := 0; i < len(opt.Input); i++ {
 			symbol := syms.Data[Size*To[opt.Input[i]] : Size*(To[opt.Input[i]]+1)]
 			copy(opt.Opt.Data[index:index+Input], symbol)
