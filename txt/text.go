@@ -27,12 +27,14 @@ const (
 	Input = Size + 2*Size
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
+	// Scale is the scale of the search
+	Scale = 64
 	// SetSize is the size of a symbol set
 	SetSize = 4
 	// SampleSets is the number of samples per set
 	SampleSets = 100
 	// Samples is the number of samplee
-	Samples = SampleSets * SetSize
+	Samples = Scale * SampleSets * SetSize
 )
 
 var (
@@ -203,7 +205,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	}
 	samples := make([]Sample, Samples)
 	rng := matrix.Rand(seed)
-	for i := 0; i < SampleSets; i++ {
+	for i := 0; i < Scale*SampleSets; i++ {
 		for j := 0; j < SetSize; j++ {
 			query := model.Query.Sample(&rng)
 			key := model.Key.Sample(&rng)
@@ -302,21 +304,12 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 }
 
 // Text mode
-func Text(full bool, s int, ss uint32) int {
+func Text(full bool, s int, seed uint32) int {
 	sets := Load()
 	opt := sets.GetSingleTrainingData(s)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
-	samples := []Sample{}
-	rng := matrix.Rand(ss)
-	for i := 1; i < 64; i++ {
-		seed := rng.Uint32()
-		if seed == 0 {
-			seed = 1
-		}
-		result := Search(sets, s, seed)
-		samples = append(samples, result...)
-	}
+	samples := Search(sets, s, seed)
 	avg := [SetSize]float64{}
 	count := [SetSize]float64{}
 	for sample := range samples {
