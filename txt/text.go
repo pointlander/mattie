@@ -22,7 +22,7 @@ const (
 	// Symbols
 	Symbols = ('z' - 'a' + 1) + ('Z' - 'A' + 1) + 3
 	// Size is the link size
-	Size = 32
+	Size = 8
 	// Input is the network input size
 	Input = Size + Size
 	// S is the scaling factor for the softmax
@@ -199,15 +199,15 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		for j := 0; j < SetSize; j++ {
 			query := model.Query.Sample(&rng)
 			key := model.Key.Sample(&rng)
-			rngOrder := matrix.Rand(1)
-			order := model.Order.Sample(&rngOrder)
-			rngSymbol := matrix.Rand(1)
-			symbol := model.Symbol.Sample(&rngSymbol)
-			/*seed := rng.Uint32()
+			//rngOrder := matrix.Rand(1)
+			order := model.Order.Sample(&rng)
+			//rngSymbol := matrix.Rand(1)
+			symbol := model.Symbol.Sample(&rng)
+			seed := rng.Uint32()
 			if seed == 0 {
 				seed += 1
-			}*/
-			Rng := matrix.Rand(1)
+			}
+			Rng := matrix.Rand(seed)
 			samples[i*SetSize+j].Rng = &Rng
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
