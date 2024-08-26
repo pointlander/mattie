@@ -24,7 +24,7 @@ const (
 	// Size is the link size
 	Size = 32
 	// Input is the network input size
-	Input = Size + 2*Size
+	Input = Size + Size
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// SetSize is the size of a symbol set
@@ -76,11 +76,7 @@ func PageRank(Q, K matrix.Matrix) float64 {
 		for j := 0; j < Q.Rows; j++ {
 			Q := Q.Data[j*Q.Cols : (j+1)*Q.Cols]
 			d := float64(vector.Dot(K, Q))
-			if d > 0 {
-				graph.Link(uint32(i), uint32(j), d)
-			} else {
-				graph.Link(uint32(j), uint32(i), -d)
-			}
+			graph.Link(uint32(i), uint32(j), d*d)
 		}
 	}
 	result := 0.0
@@ -115,10 +111,10 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcdabcdabcdabcda")
-	sets[2].Text = []byte("abcdabcdabcdabcdabcdab")
-	sets[3].Text = []byte("abcdabcdabcdabcdabcdabc")
-	sets[4].Text = []byte("abcdabcdabcdabcdabcdabcd")
+	sets[1].Text = []byte("abcdabcda")
+	sets[2].Text = []byte("abcdabcdab")
+	sets[3].Text = []byte("abcdabcdabc")
+	sets[4].Text = []byte("abcdabcdabcd")
 	sets[5].Text = []byte("abcddcbaabcddcbaabcddcbaabcd")
 	return sets
 }
@@ -161,7 +157,7 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 	problem := Problem{
 		Input:  txt[:len(txt)-1],
 		Output: txt[len(txt)-1:],
-		Count:  len(txt) + 1,
+		Count:  len(txt),
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	return problem
@@ -210,9 +206,9 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 			/*seed := rng.Uint32()
 			if seed == 0 {
 				seed += 1
-			}
-			Rng := matrix.Rand(seed)
-			samples[i*SetSize+j].Rng = &Rng*/
+			}*/
+			Rng := matrix.Rand(1)
+			samples[i*SetSize+j].Rng = &Rng
 			samples[i*SetSize+j].Query = query
 			samples[i*SetSize+j].Key = key
 			samples[i*SetSize+j].Order = order
@@ -223,9 +219,21 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	done := make(chan bool, 8)
 	process := func(sample *Sample) {
 		opt := sets.GetSingleTrainingData(s)
-		order := sample.Order.Sample()
+		rng := sample.Rng
+		order := make([]float32, Size)
+		for i := range order {
+			order[i] = float32(rng.NormFloat64())
+		}
+		for i := 0; i < opt.Opt.Rows; i++ {
+			copy(opt.Opt.Data[i*Input+Size:i*Input+Size+Size], order)
+			for j, value := range order {
+				order[j] = (value + float32(rng.NormFloat64())) / 2
+			}
+		}
+		/*order := sample.Order.Sample()
 		a, b := 0, 1
-		for j := 0; j < opt.Opt.Rows; j++ {
+		jj := opt.Opt.Rows - 1
+		for j := 0; j < jj; j++ {
 			x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
 			copy(opt.Opt.Data[j*Input+Size:j*Input+Size+Size],
 				order.Data[x*Size:(x+1)*Size])
@@ -233,6 +241,14 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 				order.Data[(y)*Size:(y+1)*Size])
 			a, b = b, a
 		}
+		if x := jj + a; x < opt.Opt.Rows {
+			copy(opt.Opt.Data[jj*Input+Size:jj*Input+Size+Size],
+				order.Data[x*Size:(x+1)*Size])
+		}
+		if y := jj + b; y < opt.Opt.Rows {
+			copy(opt.Opt.Data[jj*Input+Size+Size:jj*Input+Size+2*Size],
+				order.Data[(y)*Size:(y+1)*Size])
+		}*/
 		syms := sample.Symbol.Sample()
 		index := 0
 		for i := 0; i < len(opt.Input); i++ {
