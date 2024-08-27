@@ -74,7 +74,7 @@ func main() {
 		histogram := [5][4]int{}
 		for h := range histogram {
 			rng := matrix.Rand(1)
-			for i := 0; i < 8; i++ {
+			for i := 0; i < 64; i++ {
 				fmt.Println(i)
 				seed := rng.Uint32()
 				if seed == 0 {

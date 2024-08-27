@@ -28,13 +28,11 @@ const (
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// Scale is the scale of the search
-	Scale = 64
+	Scale = 48
 	// SetSize is the size of a symbol set
 	SetSize = 4
-	// SampleSets is the number of samples per set
-	SampleSets = 100
 	// Samples is the number of samplee
-	Samples = Scale * SampleSets * SetSize
+	Samples = Scale * (Scale - 1) / 2
 )
 
 var (
@@ -203,27 +201,29 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		Order:  matrix.NewCompressedRandomMatrix(Size, opt.Size()),
 		Symbol: matrix.NewCompressedRandomMatrix(Size, Symbols),
 	}
-	samples := make([]Sample, Samples)
 	rng := matrix.Rand(seed)
-	for i := 0; i < Scale*SampleSets; i++ {
-		for j := 0; j < SetSize; j++ {
-			query := model.Query.Sample(&rng)
-			key := model.Key.Sample(&rng)
-			//rngOrder := matrix.Rand(1)
+	projections := make([]matrix.CompressedGenerator, Scale)
+	for i := range projections {
+		projections[i] = model.Query.Sample(&rng)
+	}
+	index := 0
+	samples := make([]Sample, Samples)
+	for i := 0; i < Scale; i++ {
+		for j := i + 1; j < Scale; j++ {
 			order := model.Order.Sample(&rng)
-			//rngSymbol := matrix.Rand(1)
 			symbol := model.Symbol.Sample(&rng)
 			seed := rng.Uint32()
 			if seed == 0 {
 				seed += 1
 			}
 			Rng := matrix.Rand(seed)
-			samples[i*SetSize+j].Rng = &Rng
-			samples[i*SetSize+j].Query = query
-			samples[i*SetSize+j].Key = key
-			samples[i*SetSize+j].Order = order
-			samples[i*SetSize+j].Symbol = symbol
-			samples[i*SetSize+j].S = j
+			samples[index].Rng = &Rng
+			samples[index].Query = projections[i]
+			samples[index].Key = projections[j]
+			samples[index].Order = order
+			samples[index].Symbol = symbol
+			samples[index].S = index % SetSize
+			index++
 		}
 	}
 	done := make(chan bool, 8)
@@ -273,8 +273,8 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		for i := range opt.Opt.Data {
 			opt.Opt.Data[i] += float32(factor * sample.Rng.Float64())
 		}*/
-		query := sample.Query.Sample()
-		key := sample.Key.Sample()
+		query := sample.Query.Sparse()
+		key := sample.Key.Sparse()
 		q := query.MulT(opt.Opt)
 		k := key.MulT(opt.Opt)
 		sample.Cost = PageRank(q, k)
