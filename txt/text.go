@@ -210,7 +210,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	samples := make([]Sample, Samples)
 	for i := 0; i < Scale; i++ {
 		for j := i + 1; j < Scale; j++ {
-			Rng := matrix.Rand(1)
+			Rng := matrix.Rand(seed)
 			order := model.Order.Sample(&Rng)
 			symbol := model.Symbol.Sample(&Rng)
 			/*seed := rng.Uint32()
