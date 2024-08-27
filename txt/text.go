@@ -28,7 +28,7 @@ const (
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// Scale is the scale of the search
-	Scale = 48
+	Scale = 96
 	// SetSize is the size of a symbol set
 	SetSize = 4
 	// Samples is the number of samplee
@@ -210,13 +210,13 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 	samples := make([]Sample, Samples)
 	for i := 0; i < Scale; i++ {
 		for j := i + 1; j < Scale; j++ {
-			order := model.Order.Sample(&rng)
-			symbol := model.Symbol.Sample(&rng)
-			seed := rng.Uint32()
+			Rng := matrix.Rand(1)
+			order := model.Order.Sample(&Rng)
+			symbol := model.Symbol.Sample(&Rng)
+			/*seed := rng.Uint32()
 			if seed == 0 {
 				seed += 1
-			}
-			Rng := matrix.Rand(seed)
+			}*/
 			samples[index].Rng = &Rng
 			samples[index].Query = projections[i]
 			samples[index].Key = projections[j]
