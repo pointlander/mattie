@@ -313,6 +313,16 @@ func Text(full bool, s int, seed uint32) int {
 	for sample := range samples {
 		index := samples[sample].S
 		ranks := samples[sample].Ranks
+		/*a, c := 0.0, 0.0
+		for _, v := range ranks[1 : len(ranks)-1] {
+			a += v
+			c++
+		}
+		a /= c
+		a -= ranks[len(ranks)-1]
+		if a < 0 {
+			a = -a
+		}*/
 		avg[index] += ranks[len(ranks)-1]
 		count[index]++
 	}
@@ -323,6 +333,16 @@ func Text(full bool, s int, seed uint32) int {
 	for sample := range samples {
 		index := samples[sample].S
 		ranks := samples[sample].Ranks
+		/*a, c := 0.0, 0.0
+		for _, v := range ranks[1 : len(ranks)-1] {
+			a += v
+			c++
+		}
+		a /= c
+		a -= ranks[len(ranks)-1]
+		if a < 0 {
+			a = -a
+		}*/
 		diff := avg[index] - ranks[len(ranks)-1]
 		stddev[index] += diff * diff
 	}
