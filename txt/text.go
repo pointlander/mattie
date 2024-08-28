@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"sort"
 
 	"github.com/pointlander/matrix"
 	"github.com/pointlander/matrix/vector"
@@ -28,7 +29,7 @@ const (
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// Scale is the scale of the search
-	Scale = 96
+	Scale = 33 //96
 	// SetSize is the size of a symbol set
 	SetSize = 4
 	// Samples is the number of samplee
@@ -308,6 +309,37 @@ func Text(full bool, s int, seed uint32) int {
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	samples := Search(sets, s, seed)
+	r := matrix.NewMatrix(len(samples[0].Ranks)+SetSize, len(samples))
+	for sample := range samples {
+		ranks := samples[sample].Ranks
+		sets := make([]float32, 4)
+		sets[samples[sample].S] = 1
+		r.Data = append(r.Data, sets...)
+		for _, rank := range ranks {
+			r.Data = append(r.Data, float32(rank))
+		}
+	}
+	meta := PageRank(r, r)
+	type Meta struct {
+		Ranks []float32
+		Meta  float64
+	}
+	metas := make([]Meta, len(meta))
+	for i, v := range meta {
+		metas[i].Ranks = r.Data[i*r.Cols : (i+1)*r.Cols]
+		metas[i].Meta = v
+	}
+	sort.Slice(metas, func(i, j int) bool {
+		return metas[i].Meta > metas[j].Meta
+	})
+	sum := make([]float64, len(metas[0].Ranks))
+	for i := range metas {
+		for j, v := range metas[i].Ranks {
+			sum[j] += float64(v) * metas[i].Meta
+		}
+	}
+	fmt.Println(sum)
+
 	avg := [SetSize]float64{}
 	count := [SetSize]float64{}
 	for sample := range samples {
@@ -356,12 +388,19 @@ func Text(full bool, s int, seed uint32) int {
 		metric[i] = v / stddev[i]
 	}
 	fmt.Println(metric)
-	max, sym := 0.0, 0
+	/*max, sym := 0.0, 0
 	for key, value := range avg {
 		value /= stddev[key]
 		if value > max {
 			max, sym = value, key
 		}
+	}*/
+	max, sym := 0.0, 0
+	for key, value := range sum[:4] {
+		if value > max {
+			max, sym = value, key
+		}
 	}
+	fmt.Println(max, sym)
 	return sym + 1
 }
