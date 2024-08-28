@@ -69,7 +69,7 @@ func init() {
 }
 
 // PageRank computes the page rank of Q, K
-func PageRank(Q, K matrix.Matrix) float64 {
+func PageRank(Q, K matrix.Matrix) []float64 {
 	graph := pagerank.NewGraph()
 	for i := 0; i < K.Rows; i++ {
 		K := K.Data[i*K.Cols : (i+1)*K.Cols]
@@ -89,13 +89,11 @@ func PageRank(Q, K matrix.Matrix) float64 {
 			graph.Link(uint32(i), uint32(j), d*d)
 		}
 	}
-	result := 0.0
+	ranks := make([]float64, K.Rows)
 	graph.Rank(0.85, 1e-6, func(node uint32, rank float64) {
-		if node == uint32(K.Rows-1) {
-			result = rank
-		}
+		ranks[node] = rank
 	})
-	return result
+	return ranks
 }
 
 // Set is a set of examples
@@ -189,7 +187,7 @@ type Sample struct {
 	Order  matrix.CompressedGenerator
 	Symbol matrix.CompressedGenerator
 	S      int
-	Cost   float64
+	Ranks  []float64
 }
 
 // Search searches for a symbol
@@ -277,7 +275,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		key := sample.Key.Sparse()
 		q := query.MulT(opt.Opt)
 		k := key.MulT(opt.Opt)
-		sample.Cost = PageRank(q, k)
+		sample.Ranks = PageRank(q, k)
 		done <- true
 	}
 	flight, index, cpus := 0, 0, runtime.NumCPU()
@@ -314,7 +312,8 @@ func Text(full bool, s int, seed uint32) int {
 	count := [SetSize]float64{}
 	for sample := range samples {
 		index := samples[sample].S
-		avg[index] += samples[sample].Cost
+		ranks := samples[sample].Ranks
+		avg[index] += ranks[len(ranks)-1]
 		count[index]++
 	}
 	for i := range avg {
@@ -323,7 +322,8 @@ func Text(full bool, s int, seed uint32) int {
 	stddev := [SetSize]float64{}
 	for sample := range samples {
 		index := samples[sample].S
-		diff := avg[index] - samples[sample].Cost
+		ranks := samples[sample].Ranks
+		diff := avg[index] - ranks[len(ranks)-1]
 		stddev[index] += diff * diff
 	}
 	for i, v := range stddev {
