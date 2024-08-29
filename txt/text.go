@@ -309,12 +309,9 @@ func Text(full bool, s int, seed uint32) int {
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	samples := Search(sets, s, seed)
-	r := matrix.NewMatrix(len(samples[0].Ranks)+SetSize, len(samples))
+	r := matrix.NewMatrix(len(samples[0].Ranks), len(samples))
 	for sample := range samples {
 		ranks := samples[sample].Ranks
-		sets := make([]float32, 4)
-		sets[samples[sample].S] = 1
-		r.Data = append(r.Data, sets...)
 		for _, rank := range ranks {
 			r.Data = append(r.Data, float32(rank))
 		}
