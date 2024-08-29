@@ -70,7 +70,7 @@ func init() {
 }
 
 // PageRank computes the page rank of Q, K
-func PageRank(Q, K matrix.Matrix) []float64 {
+func PageRank(Q, K matrix.Matrix) []float32 {
 	graph := pagerank.NewGraph()
 	for i := 0; i < K.Rows; i++ {
 		K := K.Data[i*K.Cols : (i+1)*K.Cols]
@@ -90,9 +90,9 @@ func PageRank(Q, K matrix.Matrix) []float64 {
 			graph.Link(uint32(i), uint32(j), d*d)
 		}
 	}
-	ranks := make([]float64, K.Rows)
+	ranks := make([]float32, K.Rows)
 	graph.Rank(0.85, 1e-6, func(node uint32, rank float64) {
-		ranks[node] = rank
+		ranks[node] = float32(rank)
 	})
 	return ranks
 }
@@ -174,36 +174,35 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 
 // Model model is the random matrix model
 type Model struct {
-	Query  matrix.CompressedRandomMatrix
-	Key    matrix.CompressedRandomMatrix
-	Order  matrix.CompressedRandomMatrix
-	Symbol matrix.CompressedRandomMatrix
+	Projection matrix.CompressedRandomMatrix
+	Order      matrix.CompressedRandomMatrix
+	Symbol     matrix.CompressedRandomMatrix
 }
 
 // Sample is a sample
 type Sample struct {
 	Rng    *matrix.Rand
-	Query  matrix.CompressedGenerator
-	Key    matrix.CompressedGenerator
+	A      matrix.CompressedGenerator
+	B      matrix.CompressedGenerator
 	Order  matrix.CompressedGenerator
 	Symbol matrix.CompressedGenerator
 	S      int
-	Ranks  []float64
+	Ranks  []float32
+	Meta   float32
 }
 
 // Search searches for a symbol
 func Search(sets Sets, s int, seed uint32) []Sample {
 	opt := sets.GetSingleTrainingData(s)
 	model := Model{
-		Query:  matrix.NewCompressedRandomMatrix(Input, Input),
-		Key:    matrix.NewCompressedRandomMatrix(Input, Input),
-		Order:  matrix.NewCompressedRandomMatrix(Size, opt.Size()),
-		Symbol: matrix.NewCompressedRandomMatrix(Size, Symbols),
+		Projection: matrix.NewCompressedRandomMatrix(Input, Input),
+		Order:      matrix.NewCompressedRandomMatrix(Size, opt.Size()),
+		Symbol:     matrix.NewCompressedRandomMatrix(Size, Symbols),
 	}
 	rng := matrix.Rand(seed)
 	projections := make([]matrix.CompressedGenerator, Scale)
 	for i := range projections {
-		projections[i] = model.Query.Sample(&rng)
+		projections[i] = model.Projection.Sample(&rng)
 	}
 	index := 0
 	samples := make([]Sample, Samples)
@@ -217,8 +216,8 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 				seed += 1
 			}*/
 			samples[index].Rng = &Rng
-			samples[index].Query = projections[i]
-			samples[index].Key = projections[j]
+			samples[index].A = projections[i]
+			samples[index].B = projections[j]
 			samples[index].Order = order
 			samples[index].Symbol = symbol
 			samples[index].S = index % SetSize
@@ -272,8 +271,8 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		for i := range opt.Opt.Data {
 			opt.Opt.Data[i] += float32(factor * sample.Rng.Float64())
 		}*/
-		query := sample.Query.Sparse()
-		key := sample.Key.Sparse()
+		query := sample.A.Sparse()
+		key := sample.B.Sparse()
 		q := query.MulT(opt.Opt)
 		k := key.MulT(opt.Opt)
 		sample.Ranks = PageRank(q, k)
@@ -317,12 +316,7 @@ func Text(full bool, s int, seed uint32) int {
 		}
 	}
 	meta := PageRank(r, r)
-	type Meta struct {
-		Ranks []float32
-		Meta  float64
-		S     int
-	}
-	metas := make([]Meta, len(meta))
+	metas := make([]Sample, len(meta))
 	for i, v := range meta {
 		metas[i].Ranks = r.Data[i*r.Cols : (i+1)*r.Cols]
 		metas[i].Meta = v
@@ -331,20 +325,20 @@ func Text(full bool, s int, seed uint32) int {
 	sort.Slice(metas, func(i, j int) bool {
 		return metas[i].Meta > metas[j].Meta
 	})
-	sum := make([]float64, len(metas[0].Ranks))
+	sum := make([]float32, len(metas[0].Ranks))
 	for i := range metas {
 		for j, v := range metas[i].Ranks {
-			sum[j] += float64(v) * metas[i].Meta
+			sum[j] += v * metas[i].Meta
 		}
 	}
 	fmt.Println(sum)
-	syms := make([]float64, SetSize)
+	syms := make([]float32, SetSize)
 	for i := range metas[:33] {
 		syms[metas[i].S] += metas[i].Meta
 	}
 	fmt.Println("syms", syms)
-	avg := [SetSize]float64{}
-	count := [SetSize]float64{}
+	avg := [SetSize]float32{}
+	count := [SetSize]float32{}
 	for sample := range samples {
 		index := samples[sample].S
 		ranks := samples[sample].Ranks
@@ -364,7 +358,7 @@ func Text(full bool, s int, seed uint32) int {
 	for i := range avg {
 		avg[i] /= count[i]
 	}
-	stddev := [SetSize]float64{}
+	stddev := [SetSize]float32{}
 	for sample := range samples {
 		index := samples[sample].S
 		ranks := samples[sample].Ranks
@@ -382,11 +376,11 @@ func Text(full bool, s int, seed uint32) int {
 		stddev[index] += diff * diff
 	}
 	for i, v := range stddev {
-		stddev[i] = math.Sqrt(v)
+		stddev[i] = float32(math.Sqrt(float64(v)))
 	}
 	fmt.Println(avg)
 	fmt.Println(stddev)
-	metric := [SetSize]float64{}
+	metric := [SetSize]float32{}
 	for i, v := range avg {
 		metric[i] = v / stddev[i]
 	}
@@ -398,7 +392,7 @@ func Text(full bool, s int, seed uint32) int {
 			max, sym = value, key
 		}
 	}*/
-	max, sym := 0.0, 0
+	max, sym := float32(0.0), 0
 	for key, value := range syms {
 		if value > max {
 			max, sym = value, key
