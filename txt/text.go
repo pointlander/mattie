@@ -323,11 +323,13 @@ func Text(full bool, s int, seed uint32) int {
 	type Meta struct {
 		Ranks []float32
 		Meta  float64
+		S     int
 	}
 	metas := make([]Meta, len(meta))
 	for i, v := range meta {
 		metas[i].Ranks = r.Data[i*r.Cols : (i+1)*r.Cols]
 		metas[i].Meta = v
+		metas[i].S = samples[i].S
 	}
 	sort.Slice(metas, func(i, j int) bool {
 		return metas[i].Meta > metas[j].Meta
@@ -339,7 +341,11 @@ func Text(full bool, s int, seed uint32) int {
 		}
 	}
 	fmt.Println(sum)
-
+	syms := make([]float64, SetSize)
+	for i := range metas[:10] {
+		syms[metas[i].S] += metas[i].Meta
+	}
+	fmt.Println("syms", syms)
 	avg := [SetSize]float64{}
 	count := [SetSize]float64{}
 	for sample := range samples {
@@ -396,7 +402,7 @@ func Text(full bool, s int, seed uint32) int {
 		}
 	}*/
 	max, sym := 0.0, 0
-	for key, value := range sum[:4] {
+	for key, value := range syms {
 		if value > max {
 			max, sym = value, key
 		}
