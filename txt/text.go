@@ -339,7 +339,7 @@ func Text(full bool, s int, seed uint32) int {
 	}
 	fmt.Println(sum)
 	syms := make([]float64, SetSize)
-	for i := range metas[:10] {
+	for i := range metas[:33] {
 		syms[metas[i].S] += metas[i].Meta
 	}
 	fmt.Println("syms", syms)
