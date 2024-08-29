@@ -189,6 +189,8 @@ type Sample struct {
 	S      int
 	Ranks  []float32
 	Meta   float32
+	Avg    float64
+	Stddev float64
 }
 
 // Search searches for a symbol
@@ -321,20 +323,29 @@ func Text(full bool, s int, seed uint32) int {
 		metas[i].Ranks = r.Data[i*r.Cols : (i+1)*r.Cols]
 		metas[i].Meta = v
 		metas[i].S = samples[i].S
+		ranks := metas[i].Ranks[1:]
+		length := len(ranks)
+		avg := 0.0
+		for _, v := range ranks {
+			avg += float64(v)
+		}
+		avg /= float64(length)
+		stddev := 0.0
+		for _, v := range ranks {
+			diff := float64(v) - avg
+			stddev += diff * diff
+		}
+		stddev /= float64(length)
+		stddev = math.Sqrt(stddev)
+		metas[i].Avg = avg
+		metas[i].Stddev = stddev
 	}
 	sort.Slice(metas, func(i, j int) bool {
-		return metas[i].Meta > metas[j].Meta
+		return float64(metas[i].Meta)/metas[i].Stddev > float64(metas[j].Meta)/metas[j].Stddev
 	})
-	sum := make([]float32, len(metas[0].Ranks))
-	for i := range metas {
-		for j, v := range metas[i].Ranks {
-			sum[j] += v * metas[i].Meta
-		}
-	}
-	fmt.Println(sum)
 	syms := make([]float32, SetSize)
-	for i := range metas[:33] {
-		syms[metas[i].S] += metas[i].Meta
+	for i := range metas {
+		syms[metas[i].S] += metas[i].Meta / float32(metas[i].Stddev)
 	}
 	fmt.Println("syms", syms)
 	avg := [SetSize]float32{}
