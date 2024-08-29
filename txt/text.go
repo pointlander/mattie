@@ -188,7 +188,7 @@ type Sample struct {
 	Symbol matrix.CompressedGenerator
 	S      int
 	Ranks  []float32
-	Meta   float32
+	Metas  []float32
 }
 
 // Search searches for a symbol
@@ -308,14 +308,41 @@ func Text(full bool, s int, seed uint32) int {
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	samples := Search(sets, s, seed)
-	r := matrix.NewMatrix(len(samples[0].Ranks), len(samples))
+	length := len(samples[0].Ranks)
+	r := matrix.NewMatrix(length, len(samples))
 	for sample := range samples {
 		ranks := samples[sample].Ranks
 		for _, rank := range ranks {
 			r.Data = append(r.Data, float32(rank))
 		}
 	}
-	meta := PageRank(r, r)
+	model := Model{
+		Projection: matrix.NewCompressedRandomMatrix(length, length),
+	}
+	rng := matrix.Rand(seed)
+	projections := make([]matrix.CompressedGenerator, Scale)
+	for i := range projections {
+		projections[i] = model.Projection.Sample(&rng)
+	}
+	index := 0
+	metas := make([]Sample, Samples)
+	for i := 0; i < Scale; i++ {
+		for j := i + 1; j < Scale; j++ {
+			metas[index].Ranks = r.Data[index*r.Cols : (index+1)*r.Cols]
+			metas[index].A = projections[i]
+			metas[index].B = projections[j]
+			metas[index].S = samples[index].S
+			index++
+		}
+	}
+	for i := range metas {
+		query := metas[i].A.Sparse()
+		key := metas[i].B.Sparse()
+		q := query.MulT(r)
+		k := key.MulT(r)
+		metas[i].Metas = PageRank(q, k)
+	}
+	/*meta := PageRank(r, r)
 	metas := make([]Sample, len(meta))
 	for i, v := range meta {
 		metas[i].Ranks = r.Data[i*r.Cols : (i+1)*r.Cols]
@@ -331,10 +358,13 @@ func Text(full bool, s int, seed uint32) int {
 			sum[j] += v * metas[i].Meta
 		}
 	}
-	fmt.Println(sum)
+	fmt.Println(sum)*/
+	sort.Slice(metas, func(i, j int) bool {
+		return metas[i].Metas[len(metas[i].Metas)-1] > metas[j].Metas[len(metas[j].Metas)-1]
+	})
 	syms := make([]float32, SetSize)
 	for i := range metas[:33] {
-		syms[metas[i].S] += metas[i].Meta
+		syms[metas[i].S] += metas[i].Metas[len(metas[i].Metas)-1]
 	}
 	fmt.Println("syms", syms)
 	avg := [SetSize]float32{}
