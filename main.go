@@ -7,6 +7,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 
 	"github.com/pointlander/matrix"
 	"github.com/pointlander/mattie/original"
@@ -74,7 +75,7 @@ func main() {
 		histogram := [5][4]int{}
 		for h := range histogram {
 			rng := matrix.Rand(1)
-			for i := 0; i < 32; i++ {
+			for i := 0; i < 8; i++ {
 				fmt.Println(i)
 				seed := rng.Uint32()
 				if seed == 0 {
@@ -82,6 +83,39 @@ func main() {
 				}
 				result := txt.Text(false, h+1, seed)
 				histogram[h][result-1]++
+			}
+			i := 8
+		optimize:
+			for {
+				fmt.Println(i)
+				seed := rng.Uint32()
+				if seed == 0 {
+					seed = 1
+				}
+				result := txt.Text(false, h+1, seed)
+				histogram[h][result-1]++
+				avg := 0.0
+				for _, v := range histogram[h] {
+					avg += float64(v)
+				}
+				avg /= float64(len(histogram[h]))
+				stddev := 0.0
+				for _, v := range histogram[h] {
+					diff := float64(v) - avg
+					stddev += diff * diff
+				}
+				stddev /= float64(len(histogram[h]))
+				stddev = 1.7 * math.Sqrt(stddev)
+				for _, v := range histogram[h] {
+					diff := float64(v) - avg
+					if diff < 0 {
+						diff = -diff
+					}
+					if diff > stddev {
+						break optimize
+					}
+				}
+				i++
 			}
 		}
 		for h := range histogram {
