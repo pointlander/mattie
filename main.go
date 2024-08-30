@@ -15,6 +15,10 @@ import (
 	"github.com/pointlander/mattie/text"
 	"github.com/pointlander/mattie/text2"
 	"github.com/pointlander/mattie/txt"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 )
 
 var (
@@ -74,6 +78,7 @@ func main() {
 	} else if *FlagBrute {
 		histogram := [5][4]int{}
 		for h := range histogram {
+			points := make(plotter.XYs, 0, 8)
 			rng := matrix.Rand(1)
 			for i := 0; i < 8; i++ {
 				fmt.Println(i)
@@ -106,6 +111,7 @@ func main() {
 				}
 				stddev /= float64(len(histogram[h]))
 				stddev = 1.7 * math.Sqrt(stddev)
+				points = append(points, plotter.XY{X: float64(i), Y: stddev})
 				for _, v := range histogram[h] {
 					diff := float64(v) - avg
 					if diff < 0 {
@@ -121,6 +127,24 @@ func main() {
 						histogram[h][i] /= 2
 					}
 				}
+			}
+
+			p := plot.New()
+			p.Title.Text = "iteration vs stddev"
+			p.X.Label.Text = "iteration"
+			p.Y.Label.Text = "stddev"
+
+			scatter, err := plotter.NewScatter(points)
+			if err != nil {
+				panic(err)
+			}
+			scatter.GlyphStyle.Radius = vg.Length(1)
+			scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+			p.Add(scatter)
+
+			err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%d_stddev.png", h))
+			if err != nil {
+				panic(err)
 			}
 		}
 		for h := range histogram {
