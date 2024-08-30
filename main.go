@@ -109,13 +109,18 @@ func main() {
 				for _, v := range histogram[h] {
 					diff := float64(v) - avg
 					if diff < 0 {
-						diff = -diff
+						continue
 					}
 					if diff > stddev {
 						break optimize
 					}
 				}
 				i++
+				if i%32 == 0 {
+					for i := range histogram[h] {
+						histogram[h][i] /= 2
+					}
+				}
 			}
 		}
 		for h := range histogram {
