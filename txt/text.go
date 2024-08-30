@@ -15,6 +15,8 @@ import (
 
 	"github.com/pointlander/matrix"
 	"github.com/pointlander/matrix/vector"
+	"gonum.org/v1/gonum/mat"
+	"gonum.org/v1/gonum/stat"
 
 	"github.com/alixaxel/pagerank"
 )
@@ -311,12 +313,21 @@ func Text(full bool, s int, seed uint32) int {
 	fmt.Println(string(opt.Output))
 	samples := Search(sets, s, seed)
 	r := matrix.NewMatrix(len(samples[0].Ranks), len(samples))
+	input := make([]float64, 0, len(samples[0].Ranks)*len(samples))
 	for sample := range samples {
 		ranks := samples[sample].Ranks
 		for _, rank := range ranks {
 			r.Data = append(r.Data, float32(rank))
+			input = append(input, float64(rank))
 		}
 	}
+	x := mat.NewDense(len(samples), len(samples[0].Ranks), input)
+	dst := mat.SymDense{}
+	stat.CovarianceMatrix(&dst, x, nil)
+	rr, cc := dst.Dims()
+	fmt.Println(rr, cc)
+	fa := mat.Formatted(&dst, mat.Squeeze())
+	fmt.Println(fa)
 	meta := PageRank(r, r)
 	metas := make([]Sample, len(meta))
 	for i, v := range meta {
