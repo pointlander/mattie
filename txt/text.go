@@ -326,15 +326,36 @@ func Text(full bool, s int, seed uint32) int {
 	stat.CovarianceMatrix(&dst, x, nil)
 	rr, cc := dst.Dims()
 	fmt.Println(rr, cc)
-	//fa := mat.Formatted(&dst, mat.Squeeze())
-	//fmt.Println(fa)
-	symbol, m := 0, 0.0
-	results := make([]float64, 4)
-	for i := 1; i < cc-2; i++ {
-		value := dst.At(rr-1, i)
-		if value > 0 {
-			results[To[opt.Input[i-1]]] += value
+	fa := mat.Formatted(&dst, mat.Squeeze())
+	fmt.Println(fa)
+	graph := pagerank.NewGraph()
+	for i := 0; i < rr; i++ {
+		for j := 0; j < cc; j++ {
+			d := dst.At(i, j)
+			if d > 0 {
+				graph.Link(uint32(i), uint32(j), d)
+				graph.Link(uint32(j), uint32(i), d)
+			}
 		}
+	}
+	ranks := make([]float64, rr)
+	graph.Rank(1, 1e-6, func(node uint32, rank float64) {
+		ranks[node] = float64(rank)
+	})
+	fmt.Println("ranks", ranks)
+	results := make([]float64, 4)
+	counts := make([]float64, 4)
+	for i, v := range opt.Input {
+		results[To[v]] += ranks[i+1]
+		counts[To[v]]++
+	}
+	for i := range results {
+		results[i] /= counts[i]
+	}
+	fmt.Println("results", results)
+	/*symbol, m := 0, 0.0
+	for i := 1; i < cc-1; i++ {
+		value := dst.At(rr-1, i)
 		if value > m {
 			m, symbol = value, i
 			fmt.Printf("symbol %c %f\n", opt.Input[symbol-1], m)
@@ -343,8 +364,7 @@ func Text(full bool, s int, seed uint32) int {
 	symbol -= 1
 	if symbol < 0 {
 		return -1
-	}
-	fmt.Println(results)
+	}*/
 	meta := PageRank(r, r)
 	metas := make([]Sample, len(meta))
 	for i, v := range meta {
@@ -431,12 +451,13 @@ func Text(full bool, s int, seed uint32) int {
 			max, sym = value, key
 		}
 	}*/
-	max, sym := float32(0.0), 0
-	for key, value := range syms {
+	max, sym := 0.0, 0
+	for key, value := range results {
 		if value > max {
 			max, sym = value, key
 		}
 	}
 	fmt.Println(max, sym)
-	return int(To[opt.Input[symbol]]) + 1
+	//return int(To[opt.Input[symbol]]) + 1
+	return sym + 1
 }
