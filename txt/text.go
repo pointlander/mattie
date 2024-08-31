@@ -326,8 +326,25 @@ func Text(full bool, s int, seed uint32) int {
 	stat.CovarianceMatrix(&dst, x, nil)
 	rr, cc := dst.Dims()
 	fmt.Println(rr, cc)
-	fa := mat.Formatted(&dst, mat.Squeeze())
-	fmt.Println(fa)
+	//fa := mat.Formatted(&dst, mat.Squeeze())
+	//fmt.Println(fa)
+	symbol, m := 0, 0.0
+	results := make([]float64, 4)
+	for i := 1; i < cc-2; i++ {
+		value := dst.At(rr-1, i)
+		if value > 0 {
+			results[To[opt.Input[i-1]]] += value
+		}
+		if value > m {
+			m, symbol = value, i
+			fmt.Printf("symbol %c %f\n", opt.Input[symbol-1], m)
+		}
+	}
+	symbol -= 1
+	if symbol < 0 {
+		return -1
+	}
+	fmt.Println(results)
 	meta := PageRank(r, r)
 	metas := make([]Sample, len(meta))
 	for i, v := range meta {
@@ -421,5 +438,5 @@ func Text(full bool, s int, seed uint32) int {
 		}
 	}
 	fmt.Println(max, sym)
-	return sym + 1
+	return int(To[opt.Input[symbol]]) + 1
 }

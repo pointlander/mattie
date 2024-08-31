@@ -87,17 +87,23 @@ func main() {
 					seed = 1
 				}
 				result := txt.Text(false, h+1, seed)
+				if result < 0 {
+					continue
+				}
 				histogram[h][result-1]++
 			}
 			i := 8
-		optimize:
-			for {
+			//optimize:
+			for i < 64 {
 				fmt.Println(i)
 				seed := rng.Uint32()
 				if seed == 0 {
 					seed = 1
 				}
 				result := txt.Text(false, h+1, seed)
+				if result < 0 {
+					continue
+				}
 				histogram[h][result-1]++
 				avg := 0.0
 				for _, v := range histogram[h] {
@@ -118,7 +124,7 @@ func main() {
 						continue
 					}
 					if diff > stddev {
-						break optimize
+						//break optimize
 					}
 				}
 				i++
