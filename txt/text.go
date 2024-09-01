@@ -89,7 +89,12 @@ func PageRank(Q, K matrix.Matrix) []float32 {
 			}
 			bb = math.Sqrt(bb)
 			d := float64(vector.Dot(K, Q)) / (aa * bb)
-			graph.Link(uint32(i), uint32(j), d*d)
+			if d < 0 {
+				graph.Link(uint32(i), uint32(j), -d)
+			} else {
+				graph.Link(uint32(j), uint32(i), d)
+			}
+
 		}
 	}
 	ranks := make([]float32, K.Rows)
@@ -168,7 +173,7 @@ func (sets Sets) GetSingleTrainingData(s int) Problem {
 	problem := Problem{
 		Input:  txt[:len(txt)-1],
 		Output: txt[len(txt)-1:],
-		Count:  len(txt) + 1,
+		Count:  len(txt),
 	}
 	problem.Opt = matrix.NewZeroMatrix(Input, problem.Size())
 	return problem
@@ -244,7 +249,7 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 		}*/
 		order := sample.Order.Sample()
 		a, b := 0, 1
-		jj := opt.Opt.Rows - 1
+		jj := opt.Opt.Rows
 		for j := 0; j < jj; j++ {
 			x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
 			copy(opt.Opt.Data[j*Input+Size:j*Input+Size+Size],
@@ -253,16 +258,16 @@ func Search(sets Sets, s int, seed uint32) []Sample {
 				order.Data[(y)*Size:(y+1)*Size])
 			a, b = b, a
 		}
-		if x := jj + a; x < opt.Opt.Rows {
+		/*if x := jj + a; x < opt.Opt.Rows {
 			copy(opt.Opt.Data[jj*Input+Size:jj*Input+Size+Size],
 				order.Data[x*Size:(x+1)*Size])
 		}
 		if y := jj + b; y < opt.Opt.Rows {
 			copy(opt.Opt.Data[jj*Input+Size+Size:jj*Input+Size+2*Size],
 				order.Data[(y)*Size:(y+1)*Size])
-		}
+		}*/
 		syms := sample.Symbol.Sample()
-		index := Input
+		index := 0
 		for i := 0; i < len(opt.Input); i++ {
 			symbol := syms.Data[Size*To[opt.Input[i]] : Size*(To[opt.Input[i]]+1)]
 			copy(opt.Opt.Data[index:index+Input], symbol)
@@ -460,4 +465,65 @@ func Text(full bool, s int, seed uint32) int {
 	fmt.Println(max, sym)
 	//return int(To[opt.Input[symbol]]) + 1
 	return sym + 1
+}
+
+// Text mode
+func Text2(full bool, s int, seed uint32) int {
+	sets := Load()
+	rng := matrix.Rand(seed)
+	opt := sets.GetSingleTrainingData(s)
+	fmt.Println(string(opt.Input))
+	fmt.Println(string(opt.Output))
+	var y *mat.Dense
+	for i := 0; i < 32; i++ {
+		seed := rng.Uint32()
+		if seed == 0 {
+			seed = 1
+		}
+		samples := Search(sets, s, seed)
+		input := make([]float64, 0, len(samples[0].Ranks)*len(samples))
+		for sample := range samples {
+			ranks := samples[sample].Ranks
+			for _, rank := range ranks {
+				input = append(input, float64(rank))
+			}
+		}
+		x := mat.NewDense(len(samples), len(samples[0].Ranks), input)
+		dst := mat.SymDense{}
+		stat.CovarianceMatrix(&dst, x, nil)
+		if y == nil {
+			rr, cc := dst.Dims()
+			y = mat.NewDense(rr, cc, make([]float64, rr*cc))
+		}
+		y.Add(y, &dst)
+	}
+	fa := mat.Formatted(y, mat.Squeeze())
+	fmt.Println(fa)
+	rr, cc := y.Dims()
+	graph := pagerank.NewGraph()
+	for i := 0; i < rr; i++ {
+		for j := 0; j < cc; j++ {
+			d := y.At(i, j)
+			if d > 0 {
+				graph.Link(uint32(i), uint32(j), d)
+				graph.Link(uint32(j), uint32(i), d)
+			}
+		}
+	}
+	ranks := make([]float64, rr)
+	graph.Rank(1, 1e-6, func(node uint32, rank float64) {
+		ranks[node] = float64(rank)
+	})
+	fmt.Println("ranks", ranks)
+	results := make([]float64, 4)
+	counts := make([]float64, 4)
+	for i, v := range opt.Input {
+		results[To[v]] += ranks[i+1]
+		counts[To[v]]++
+	}
+	for i := range results {
+		results[i] /= counts[i]
+	}
+	fmt.Println("results", results)
+	return 0
 }

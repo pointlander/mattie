@@ -36,6 +36,8 @@ var (
 	FlagFull = flag.Bool("full", false, "compute the full string")
 	// FlagBrute brute mode
 	FlagBrute = flag.Bool("brute", false, "brute mode")
+	// FlagFinesse fin mode
+	FlagFinesse = flag.Bool("finesse", false, "finesse mode")
 )
 
 func main() {
@@ -156,5 +158,7 @@ func main() {
 		for h := range histogram {
 			fmt.Println(histogram[h])
 		}
+	} else if *FlagFinesse {
+		txt.Text2(false, 2, 1)
 	}
 }
