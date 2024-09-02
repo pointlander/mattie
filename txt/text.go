@@ -475,6 +475,8 @@ func Text2(full bool, s int, seed uint32) int {
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
 	var y [SetSize]*mat.Dense
+	var avg [SetSize][]float64
+	var c [SetSize]float64
 	for i := 0; i < 32; i++ {
 		seed := rng.Uint32()
 		if seed == 0 {
@@ -493,8 +495,13 @@ func Text2(full bool, s int, seed uint32) int {
 		for sample := range samples {
 			ranks := samples[sample].Ranks
 			h := samples[sample].S
-			for _, rank := range ranks {
+			if avg[h] == nil {
+				avg[h] = make([]float64, len(ranks))
+			}
+			c[h]++
+			for j, rank := range ranks {
 				input[h] = append(input[h], float64(rank))
+				avg[h][j] += float64(rank)
 			}
 		}
 		for j := range counts {
@@ -508,6 +515,11 @@ func Text2(full bool, s int, seed uint32) int {
 			y[j].Add(y[j], &dst)
 		}
 	}
+	for h := range avg {
+		for j := range avg[h] {
+			avg[h][j] /= c[h]
+		}
+	}
 	for h := range y {
 		fa := mat.Formatted(y[h], mat.Squeeze())
 		fmt.Println(fa)
@@ -517,6 +529,7 @@ func Text2(full bool, s int, seed uint32) int {
 			for j := 0; j < cc; j++ {
 				d := y[h].At(i, j)
 				if d > 0 {
+					d = avg[h][j] / d
 					graph.Link(uint32(i), uint32(j), d)
 					graph.Link(uint32(j), uint32(i), d)
 				}
@@ -530,7 +543,7 @@ func Text2(full bool, s int, seed uint32) int {
 		results := make([]float64, 4)
 		counts := make([]float64, 4)
 		for i, v := range opt.Input {
-			results[To[v]] += ranks[i+1]
+			results[To[v]] += ranks[i]
 			counts[To[v]]++
 		}
 		for i := range results {
@@ -538,5 +551,6 @@ func Text2(full bool, s int, seed uint32) int {
 		}
 		fmt.Println("results", results)
 	}
+	fmt.Println(avg)
 	return 0
 }
