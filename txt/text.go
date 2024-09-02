@@ -474,56 +474,69 @@ func Text2(full bool, s int, seed uint32) int {
 	opt := sets.GetSingleTrainingData(s)
 	fmt.Println(string(opt.Input))
 	fmt.Println(string(opt.Output))
-	var y *mat.Dense
+	var y [SetSize]*mat.Dense
 	for i := 0; i < 32; i++ {
 		seed := rng.Uint32()
 		if seed == 0 {
 			seed = 1
 		}
 		samples := Search(sets, s, seed)
-		input := make([]float64, 0, len(samples[0].Ranks)*len(samples))
+		input := make([][]float64, SetSize)
+		var counts [SetSize]int
+		for sample := range samples {
+			h := samples[sample].S
+			counts[h]++
+		}
+		for j := range input {
+			input[j] = make([]float64, 0, len(samples[0].Ranks)*counts[j])
+		}
 		for sample := range samples {
 			ranks := samples[sample].Ranks
+			h := samples[sample].S
 			for _, rank := range ranks {
-				input = append(input, float64(rank))
+				input[h] = append(input[h], float64(rank))
 			}
 		}
-		x := mat.NewDense(len(samples), len(samples[0].Ranks), input)
-		dst := mat.SymDense{}
-		stat.CovarianceMatrix(&dst, x, nil)
-		if y == nil {
-			rr, cc := dst.Dims()
-			y = mat.NewDense(rr, cc, make([]float64, rr*cc))
+		for j := range counts {
+			x := mat.NewDense(counts[j], len(samples[0].Ranks), input[j])
+			dst := mat.SymDense{}
+			stat.CovarianceMatrix(&dst, x, nil)
+			if y[j] == nil {
+				rr, cc := dst.Dims()
+				y[j] = mat.NewDense(rr, cc, make([]float64, rr*cc))
+			}
+			y[j].Add(y[j], &dst)
 		}
-		y.Add(y, &dst)
 	}
-	fa := mat.Formatted(y, mat.Squeeze())
-	fmt.Println(fa)
-	rr, cc := y.Dims()
-	graph := pagerank.NewGraph()
-	for i := 0; i < rr; i++ {
-		for j := 0; j < cc; j++ {
-			d := y.At(i, j)
-			if d > 0 {
-				graph.Link(uint32(i), uint32(j), d)
-				graph.Link(uint32(j), uint32(i), d)
+	for h := range y {
+		fa := mat.Formatted(y[h], mat.Squeeze())
+		fmt.Println(fa)
+		rr, cc := y[h].Dims()
+		graph := pagerank.NewGraph()
+		for i := 0; i < rr; i++ {
+			for j := 0; j < cc; j++ {
+				d := y[h].At(i, j)
+				if d > 0 {
+					graph.Link(uint32(i), uint32(j), d)
+					graph.Link(uint32(j), uint32(i), d)
+				}
 			}
 		}
+		ranks := make([]float64, rr)
+		graph.Rank(1, 1e-6, func(node uint32, rank float64) {
+			ranks[node] = float64(rank)
+		})
+		fmt.Println("ranks", ranks)
+		results := make([]float64, 4)
+		counts := make([]float64, 4)
+		for i, v := range opt.Input {
+			results[To[v]] += ranks[i+1]
+			counts[To[v]]++
+		}
+		for i := range results {
+			results[i] /= counts[i]
+		}
+		fmt.Println("results", results)
 	}
-	ranks := make([]float64, rr)
-	graph.Rank(1, 1e-6, func(node uint32, rank float64) {
-		ranks[node] = float64(rank)
-	})
-	fmt.Println("ranks", ranks)
-	results := make([]float64, 4)
-	counts := make([]float64, 4)
-	for i, v := range opt.Input {
-		results[To[v]] += ranks[i+1]
-		counts[To[v]]++
-	}
-	for i := range results {
-		results[i] /= counts[i]
-	}
-	fmt.Println("results", results)
 	return 0
 }
