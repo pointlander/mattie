@@ -477,7 +477,7 @@ func Text2(full bool, s int, seed uint32) int {
 	var y [SetSize]*mat.Dense
 	var avg [SetSize][]float64
 	var c [SetSize]float64
-	for i := 0; i < 32; i++ {
+	for i := 0; i < 8; i++ {
 		seed := rng.Uint32()
 		if seed == 0 {
 			seed = 1
@@ -578,12 +578,22 @@ func Text2(full bool, s int, seed uint32) int {
 	var account [SetSize][4]float64
 	for h := 0; h < 4; h++ {
 		for i, v := range opt.Input {
-			account[h][To[v]] += y[h].At(i, i)
+			account[h][To[v]] += y[h].At(i, i) / avg[h][i]
 		}
 		account[h][h] += y[h].At(len(opt.Input), len(opt.Input))
 	}
 	for i := range account {
 		fmt.Println(account[i])
+	}
+	{
+		min, symbol := math.MaxFloat64, 0
+		for i := 0; i < SetSize; i++ {
+			v := account[i][i]
+			if v < min {
+				min, symbol = v, i
+			}
+		}
+		fmt.Println(min, symbol+1)
 	}
 	return 0
 }
