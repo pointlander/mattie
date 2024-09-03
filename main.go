@@ -159,6 +159,6 @@ func main() {
 			fmt.Println(histogram[h])
 		}
 	} else if *FlagFinesse {
-		txt.Text2(false, 2, 1)
+		txt.Text2(false, 1, 1)
 	}
 }

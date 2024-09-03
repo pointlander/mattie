@@ -520,25 +520,30 @@ func Text2(full bool, s int, seed uint32) int {
 			avg[h][j] /= c[h]
 		}
 	}
+	max, symbol := 0.0, 0
+	sum := [SetSize]float64{}
 	for h := range y {
 		fa := mat.Formatted(y[h], mat.Squeeze())
 		fmt.Println(fa)
 		rr, cc := y[h].Dims()
-		graph := pagerank.NewGraph()
-		for i := 0; i < rr; i++ {
-			for j := 0; j < cc; j++ {
-				d := y[h].At(i, j)
-				if d > 0 {
-					d = avg[h][j] / d
-					graph.Link(uint32(i), uint32(j), d)
-					graph.Link(uint32(j), uint32(i), d)
+		ranks := make([]float64, rr)
+		for i := 0; i < 32; i++ {
+			graph := pagerank.NewGraph()
+			for i := 0; i < rr; i++ {
+				for j := 0; j < cc; j++ {
+					d := (y[h].At(i, j)*rng.NormFloat64() + avg[h][j])
+					if d > 0 {
+						graph.Link(uint32(i), uint32(j), d)
+						//graph.Link(uint32(j), uint32(i), d)
+					} else {
+						graph.Link(uint32(j), uint32(i), -d)
+					}
 				}
 			}
+			graph.Rank(1, 1e-6, func(node uint32, rank float64) {
+				ranks[node] += float64(rank)
+			})
 		}
-		ranks := make([]float64, rr)
-		graph.Rank(1, 1e-6, func(node uint32, rank float64) {
-			ranks[node] = float64(rank)
-		})
 		fmt.Println("ranks", ranks)
 		results := make([]float64, 4)
 		counts := make([]float64, 4)
@@ -550,7 +555,24 @@ func Text2(full bool, s int, seed uint32) int {
 			results[i] /= counts[i]
 		}
 		fmt.Println("results", results)
+		for i, v := range results {
+			sum[i] += v
+			if v > max {
+				max, symbol = v, i
+			}
+		}
+	}
+	fmt.Println(sum)
+	{
+		max, symbol := 0.0, 0
+		for i, v := range sum {
+			if v > max {
+				max, symbol = v, i
+			}
+		}
+		fmt.Println(max, symbol+1)
 	}
 	fmt.Println(avg)
+	fmt.Println(max, symbol+1)
 	return 0
 }
