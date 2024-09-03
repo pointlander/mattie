@@ -160,23 +160,26 @@ func main() {
 		}
 	} else if *FlagFinesse {
 		seed := uint32(2)
-		for {
+		histogram := [5][4]int{}
+		for e := 0; e < 16; e++ {
 			correct := 0
 			for i := 1; i < 5; i++ {
 				result := txt.Text2(false, i, seed)
+				histogram[i-1][result-1]++
 				if result == i {
 					correct++
 				}
 			}
-			if txt.Text2(false, 5, seed) == 4 {
+			result := txt.Text2(false, 5, seed)
+			histogram[4][result-1]++
+			if result == 4 {
 				correct++
 			}
 			fmt.Println("correct", correct)
-			if correct == 5 {
-				break
-			}
 			seed++
 		}
-		fmt.Println("seed", seed)
+		for i := range histogram {
+			fmt.Println(histogram[i])
+		}
 	}
 }

@@ -127,10 +127,10 @@ func Load() Sets {
 	}
 	sets[0].Text = data
 
-	sets[1].Text = []byte("abcdabcda")
-	sets[2].Text = []byte("abcdabcdab")
-	sets[3].Text = []byte("abcdabcdabc")
-	sets[4].Text = []byte("abcdabcdabcd")
+	sets[1].Text = []byte("abcdabcdabcda")
+	sets[2].Text = []byte("abcdabcdabcdab")
+	sets[3].Text = []byte("abcdabcdabcdabc")
+	sets[4].Text = []byte("abcdabcdabcdabcd")
 	sets[5].Text = []byte("abcddcbaabcddcbaabcddcbaabcd")
 	return sets
 }
