@@ -580,11 +580,12 @@ func Text2(full bool, s int, seed uint32) int {
 		for i, v := range opt.Input {
 			account[h][To[v]] += y[h].At(i, i) / avg[h][i]
 		}
-		account[h][h] += y[h].At(len(opt.Input), len(opt.Input))
+		account[h][h] += y[h].At(len(opt.Input), len(opt.Input)) / avg[h][h]
 	}
 	for i := range account {
 		fmt.Println(account[i])
 	}
+	result := 0
 	{
 		min, symbol := math.MaxFloat64, 0
 		for i := 0; i < SetSize; i++ {
@@ -594,6 +595,7 @@ func Text2(full bool, s int, seed uint32) int {
 			}
 		}
 		fmt.Println(min, symbol+1)
+		result = symbol + 1
 	}
-	return 0
+	return result
 }

@@ -159,6 +159,16 @@ func main() {
 			fmt.Println(histogram[h])
 		}
 	} else if *FlagFinesse {
-		txt.Text2(false, 1, 1)
+		seed, correct := uint32(1), 0
+		for i := 1; i < 5; i++ {
+			result := txt.Text2(false, i, seed)
+			if result == i {
+				correct++
+			}
+		}
+		if txt.Text2(false, 5, seed) == 4 {
+			correct++
+		}
+		fmt.Println("correct", correct)
 	}
 }
