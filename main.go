@@ -182,4 +182,71 @@ func main() {
 			fmt.Println(histogram[i])
 		}
 	}
+
+	{
+		samples := make(plotter.Values, 0, 8)
+		rng := matrix.Rand(1)
+		for i := 0; i < 1024*1024; i++ {
+			sample := rng.Float64()
+			samples = append(samples, sample)
+		}
+
+		p := plot.New()
+		p.Title.Text = "float uniform"
+
+		histogram, err := plotter.NewHist(samples, 100)
+		if err != nil {
+			panic(err)
+		}
+		p.Add(histogram)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "float_uniform.png")
+		if err != nil {
+			panic(err)
+		}
+	}
+	{
+		samples := make(plotter.Values, 0, 8)
+		rng := matrix.Rand(1)
+		for i := 0; i < 1024*1024; i++ {
+			sample := rng.Uint32()
+			samples = append(samples, float64(sample))
+		}
+
+		p := plot.New()
+		p.Title.Text = "float uniform"
+
+		histogram, err := plotter.NewHist(samples, 100)
+		if err != nil {
+			panic(err)
+		}
+		p.Add(histogram)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "int_uniform.png")
+		if err != nil {
+			panic(err)
+		}
+	}
+	{
+		samples := make(plotter.Values, 0, 8)
+		rng := matrix.Rand(1)
+		for i := 0; i < 1024*1024; i++ {
+			sample := rng.NormFloat64()
+			samples = append(samples, sample)
+		}
+
+		p := plot.New()
+		p.Title.Text = "float uniform"
+
+		histogram, err := plotter.NewHist(samples, 100)
+		if err != nil {
+			panic(err)
+		}
+		p.Add(histogram)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "float_norm.png")
+		if err != nil {
+			panic(err)
+		}
+	}
 }
