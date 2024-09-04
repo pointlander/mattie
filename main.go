@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"math/rand"
 
 	"github.com/pointlander/matrix"
 	"github.com/pointlander/mattie/original"
@@ -15,6 +16,7 @@ import (
 	"github.com/pointlander/mattie/text"
 	"github.com/pointlander/mattie/text2"
 	"github.com/pointlander/mattie/txt"
+
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -183,6 +185,7 @@ func main() {
 		}
 	}
 
+	// custom
 	{
 		samples := make(plotter.Values, 0, 8)
 		rng := matrix.Rand(1)
@@ -245,6 +248,74 @@ func main() {
 		p.Add(histogram)
 
 		err = p.Save(8*vg.Inch, 8*vg.Inch, "float_norm.png")
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// golang
+	{
+		samples := make(plotter.Values, 0, 8)
+		rng := rand.New(rand.NewSource(1))
+		for i := 0; i < 1024*1024; i++ {
+			sample := rng.Float64()
+			samples = append(samples, sample)
+		}
+
+		p := plot.New()
+		p.Title.Text = "float uniform"
+
+		histogram, err := plotter.NewHist(samples, 100)
+		if err != nil {
+			panic(err)
+		}
+		p.Add(histogram)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "float_uniform_golang.png")
+		if err != nil {
+			panic(err)
+		}
+	}
+	{
+		samples := make(plotter.Values, 0, 8)
+		rng := rand.New(rand.NewSource(1))
+		for i := 0; i < 1024*1024; i++ {
+			sample := rng.Uint32()
+			samples = append(samples, float64(sample))
+		}
+
+		p := plot.New()
+		p.Title.Text = "float uniform"
+
+		histogram, err := plotter.NewHist(samples, 100)
+		if err != nil {
+			panic(err)
+		}
+		p.Add(histogram)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "int_uniform_golang.png")
+		if err != nil {
+			panic(err)
+		}
+	}
+	{
+		samples := make(plotter.Values, 0, 8)
+		rng := rand.New(rand.NewSource(1))
+		for i := 0; i < 1024*1024; i++ {
+			sample := rng.NormFloat64()
+			samples = append(samples, sample)
+		}
+
+		p := plot.New()
+		p.Title.Text = "float uniform"
+
+		histogram, err := plotter.NewHist(samples, 100)
+		if err != nil {
+			panic(err)
+		}
+		p.Add(histogram)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "float_norm_golang.png")
 		if err != nil {
 			panic(err)
 		}
