@@ -119,7 +119,7 @@ func (p Problem) Size() int {
 	for _, input := range p.Input {
 		sum += len(input.Input.I) + len(input.Output.I) + 1 + input.Input.H + 1 + input.Output.H
 	}
-	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 2 + p.Tail
+	return sum + len(p.Output.Input.I) + p.Output.Input.H + 1 + 1 + p.Tail + Symbols
 }
 
 // GetSingleTrainingData gets the training data
@@ -256,7 +256,7 @@ type Sample struct {
 	Value matrix.Generator
 	S     int
 	Order matrix.Generator
-	Cost  float64
+	Cost  [Symbols]float64
 	Grid  [][]int
 }
 
@@ -286,7 +286,7 @@ func Text2() {
 			Query: matrix.NewRandomMatrix(Input, Input),
 			Key:   matrix.NewRandomMatrix(Input, Input),
 			Value: matrix.NewRandomMatrix(Input, Input),
-			Order: matrix.NewRandomMatrix(7, opt.Size()),
+			Order: matrix.NewRandomMatrix(7, opt.Size()-(Symbols-1)),
 		}
 		type Stat struct {
 			Cut  int
@@ -301,83 +301,107 @@ func Text2() {
 			samples[i].Value = model.Value.Sample(&rng)
 			samples[i].Order = model.Order.Sample(&rng)
 		}
+		done := make(chan bool, 8)
+		process := func(sample *Sample) {
+			opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
+			order := sample.Order.Sample()
+			a, b := 0, 1
+			for j := 0; j < opt.Opt.Rows-Symbols; j++ {
+				x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
+				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
+				a, b = b, a
+			}
+			last := opt.Opt.Rows - Symbols - 1
+			for j := opt.Opt.Rows - Symbols; j < opt.Opt.Rows; j++ {
+				x, y := (last+a)%opt.Opt.Rows, (last+b)%opt.Opt.Rows
+				copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7],
+					order.Data[x*7:(x+1)*7])
+				copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7],
+					order.Data[(y)*7:(y+1)*7])
+			}
+			index := 0
+			for i := len(suffix) + Symbols; i > Symbols; i-- {
+				opt.Opt.Data[Input*(opt.Size()-i)+int(suffix[index])] = 1
+				index++
+			}
+			for i := 0; i < Symbols; i++ {
+				params := opt.Opt.Data[Input*(opt.Size()-(Symbols-i)):]
+				params[i] = 1
+			}
+
+			/*out := matrix.SelfAttention(
+			sample.Query.MulT(opt.Opt),
+			sample.Key.MulT(opt.Opt),
+			sample.Value.MulT(opt.Opt))*/
+			query := sample.Query.Sample()
+			key := sample.Key.Sample()
+			value := sample.Value.Sample()
+			entropy := matrix.SelfEntropy(
+				query.MulT(opt.Opt),
+				key.MulT(opt.Opt),
+				value.MulT(opt.Opt))
+			//sum += float64(entropy[len(entropy)-1])
+			s := 0
+			for _, value := range entropy[len(entropy)-Symbols:] {
+				sample.Cost[s] = float64(value)
+				s++
+			}
+			/*for j := 0; j < out.Rows; j++ {
+				for k := 0; k < out.Cols; k++ {
+					diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
+					sum += float64(diff*diff)
+				}
+			}*/
+			done <- true
+		}
+		flight, index, cpus := 0, 0, runtime.NumCPU()
+		for flight < cpus && index < len(samples) {
+			sample := &samples[index]
+			go process(sample)
+			index++
+			flight++
+		}
+		for index < len(samples) {
+			<-done
+			flight--
+
+			sample := &samples[index]
+			go process(sample)
+			index++
+			flight++
+		}
+		for i := 0; i < flight; i++ {
+			<-done
+		}
+
+		x := [Symbols]int{}
+		for i := range samples {
+			max, index := 0.0, 0
+			for j, value := range samples[i].Cost {
+				if value > max {
+					max, index = value, j
+				}
+			}
+			fmt.Println(index, max)
+			x[index]++
+		}
+		for k, v := range x {
+			fmt.Printf("%d: %d\n", k, v)
+		}
+		fmt.Println()
+
 		for s := 0; s < Symbols; s++ {
-			for i := range samples {
-				samples[i].S = s
-			}
-			done := make(chan bool, 8)
-			process := func(sample *Sample) {
-				opt := sets.GetSingleTrainingData(len(suffix), 0, 0)
-				sum := 0.0
-				order := sample.Order.Sample()
-				a, b := 0, 1
-				for j := 0; j < opt.Opt.Rows; j++ {
-					x, y := (j+a)%opt.Opt.Rows, (j+b)%opt.Opt.Rows
-					copy(opt.Opt.Data[j*Input+Symbols:j*Input+Symbols+7], order.Data[x*7:(x+1)*7])
-					copy(opt.Opt.Data[j*Input+Symbols+7:j*Input+Symbols+2*7], order.Data[(y)*7:(y+1)*7])
-					a, b = b, a
-				}
-				index := 0
-				for i := len(suffix) + 1; i > 1; i-- {
-					opt.Opt.Data[Input*(opt.Size()-i)+int(suffix[index])] = 1
-					index++
-				}
-				params := opt.Opt.Data[Input*(opt.Size()-1):]
-				params[sample.S] = 1
-				/*out := matrix.SelfAttention(
-				sample.Query.MulT(opt.Opt),
-				sample.Key.MulT(opt.Opt),
-				sample.Value.MulT(opt.Opt))*/
-				query := sample.Query.Sample()
-				key := sample.Key.Sample()
-				value := sample.Value.Sample()
-				entropy := matrix.SelfEntropy(
-					query.MulT(opt.Opt),
-					key.MulT(opt.Opt),
-					value.MulT(opt.Opt))
-				//sum += float64(entropy[len(entropy)-1])
-				for _, value := range entropy {
-					sum += float64(value)
-				}
-				/*for j := 0; j < out.Rows; j++ {
-					for k := 0; k < out.Cols; k++ {
-						diff := out.Data[j*out.Cols+k] - opt.Opt.Data[j*out.Cols+k]
-						sum += float64(diff*diff)
-					}
-				}*/
-				sample.Cost = sum
-				done <- true
-			}
-			flight, index, cpus := 0, 0, runtime.NumCPU()
-			for flight < cpus && index < len(samples) {
-				sample := &samples[index]
-				go process(sample)
-				index++
-				flight++
-			}
-			for index < len(samples) {
-				<-done
-				flight--
-
-				sample := &samples[index]
-				go process(sample)
-				index++
-				flight++
-			}
-			for i := 0; i < flight; i++ {
-				<-done
-			}
-
 			sort.Slice(samples, func(i, j int) bool {
-				return samples[i].Cost < samples[j].Cost
+				return samples[i].Cost[s] < samples[j].Cost[s]
 			})
 			avg, vr := 0.0, 0.0
 			for i := 0; i < len(samples); i++ {
-				avg += samples[i].Cost
+				avg += samples[i].Cost[s]
 			}
 			avg /= float64(len(samples))
 			for i := 0; i < len(samples); i++ {
-				diff := samples[i].Cost - avg
+				diff := samples[i].Cost[s] - avg
 				vr += diff * diff
 			}
 			vr /= float64(len(samples))
@@ -390,20 +414,20 @@ func Text2() {
 				avga, avgb := 0.0, 0.0
 				vara, varb := 0.0, 0.0
 				for j := 0; j < i; j++ {
-					avga += samples[j].Cost
+					avga += samples[j].Cost[s]
 				}
 				avga /= float64(i)
 				for j := 0; j < i; j++ {
-					diff := samples[j].Cost - avga
+					diff := samples[j].Cost[s] - avga
 					vara += diff * diff
 				}
 				vara /= float64(i)
 				for j := i; j < len(samples); j++ {
-					avgb += samples[j].Cost
+					avgb += samples[j].Cost[s]
 				}
 				avgb /= float64(len(samples) - i)
 				for j := i; j < len(samples); j++ {
-					diff := samples[j].Cost - avgb
+					diff := samples[j].Cost[s] - avgb
 					varb += diff * diff
 				}
 				varb /= float64(len(samples) - i)
@@ -440,15 +464,15 @@ func Text2() {
 
 			cost := 0.0
 			for _, sample := range samples {
-				cost += sample.Cost
+				cost += sample.Cost[s]
 			}
 			stats[s].Cut = cut
 			stats[s].Cost = cost
 		}
 
-		for s, stat := range stats {
+		/*for s, stat := range stats {
 			fmt.Println(s, stat.Cost)
-		}
+		}*/
 
 		max, index := math.MaxFloat64, 0
 		if depth > 0 {
